@@ -8,9 +8,9 @@ const process = std.process;
 
 const Allocator = mem.Allocator;
 const CrossTarget = std.zig.CrossTarget;
-const Elf = @import("Elf.zig");
+pub const Elf = @import("Elf.zig");
 pub const MachO = @import("MachO.zig");
-const Coff = @import("Coff.zig");
+pub const Coff = @import("Coff.zig");
 
 tag: Tag,
 allocator: Allocator,

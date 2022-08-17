@@ -35,8 +35,12 @@ pub fn deinit(self: *Object, allocator: Allocator) void {
     }
     self.managed_atoms.deinit(allocator);
     self.atom_table.deinit(allocator);
-    allocator.free(self.name);
-    allocator.free(self.data);
+
+    // ZAR MODIFICATION:
+    // We manage memory of file ourselves in zar - so
+    // freeing this here for that does not make much sense.
+    // allocator.free(self.name);
+    // allocator.free(self.data);
 }
 
 pub fn parse(self: *Object, allocator: Allocator, cpu_arch: std.Target.Cpu.Arch) !void {
@@ -65,13 +69,16 @@ pub fn parse(self: *Object, allocator: Allocator, cpu_arch: std.Target.Cpu.Arch)
         log.debug("Invalid file type {any}, expected ET.REL", .{self.header.e_type});
         return error.NotObject;
     }
-    if (self.header.e_machine != cpu_arch.toElfMachine()) {
-        log.debug("Invalid architecture {any}, expected {any}", .{
-            self.header.e_machine,
-            cpu_arch.toElfMachine(),
-        });
-        return error.InvalidCpuArch;
-    }
+    // ZAR MODIFICATION: This check doesn't serve any purpose for the needs of
+    // zar.
+    _ = cpu_arch;
+    // if (self.header.e_machine != cpu_arch.toElfMachine()) {
+    //     log.debug("Invalid architecture {any}, expected {any}", .{
+    //         self.header.e_machine,
+    //         cpu_arch.toElfMachine(),
+    //     });
+    //     return error.InvalidCpuArch;
+    // }
     if (self.header.e_version != 1) {
         log.debug("Invalid ELF version {d}, expected 1", .{self.header.e_version});
         return error.NotObject;

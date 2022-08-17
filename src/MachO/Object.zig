@@ -79,9 +79,8 @@ pub fn parse(self: *Object, allocator: Allocator, cpu_arch: std.Target.Cpu.Arch)
         },
     };
 
-    // ZAR MODIFICATION: This check doesn't really seem to serve any purpose?
-    // if zar needed CPU arch for any given file being arhived, this would
-    // probably be the way it would infer it anyway.
+    // ZAR MODIFICATION: This check doesn't serve any purpose for the needs of
+    // zar.
     _ = this_arch;
     _ = cpu_arch;
     // if (this_arch != cpu_arch) {
