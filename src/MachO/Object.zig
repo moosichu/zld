@@ -49,8 +49,11 @@ pub fn deinit(self: *Object, gpa: Allocator) void {
     }
     self.managed_atoms.deinit(gpa);
 
-    gpa.free(self.name);
-    gpa.free(self.contents);
+    // ZAR MODIFICATION:
+    // We manage memory of this ourselves in zar - so
+    // freeing this here for that does not make much sense.
+    // gpa.free(self.name);
+    // gpa.free(self.contents);
 }
 
 pub fn parse(self: *Object, allocator: Allocator, cpu_arch: std.Target.Cpu.Arch) !void {
@@ -75,13 +78,19 @@ pub fn parse(self: *Object, allocator: Allocator, cpu_arch: std.Target.Cpu.Arch)
             return error.UnsupportedCpuArchitecture;
         },
     };
-    if (this_arch != cpu_arch) {
-        log.err("mismatched cpu architecture: expected {s}, found {s}", .{
-            @tagName(cpu_arch),
-            @tagName(this_arch),
-        });
-        return error.MismatchedCpuArchitecture;
-    }
+
+    // ZAR MODIFICATION: This check doesn't really seem to serve any purpose?
+    // if zar needed CPU arch for any given file being arhived, this would
+    // probably be the way it would infer it anyway.
+    _ = this_arch;
+    _ = cpu_arch;
+    // if (this_arch != cpu_arch) {
+    //     log.err("mismatched cpu architecture: expected {s}, found {s}", .{
+    //         @tagName(cpu_arch),
+    //         @tagName(this_arch),
+    //     });
+    //     return error.MismatchedCpuArchitecture;
+    // }
 
     var it = LoadCommandIterator{
         .ncmds = self.header.ncmds,
