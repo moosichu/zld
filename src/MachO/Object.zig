@@ -391,7 +391,7 @@ pub fn splitIntoAtoms(self: *Object, macho_file: *MachO, object_id: u32) !void {
                     break :blk cc[start..][0..size];
                 } else null;
                 const atom_align = if (addr > 0)
-                    math.min(@ctz(u64, addr), sect.@"align")
+                    math.min(@ctz(addr), sect.@"align")
                 else
                     sect.@"align";
                 const atom = try self.createAtomFromSubsection(
@@ -583,6 +583,12 @@ pub fn parseDwarfInfo(self: Object) error{Overflow}!dwarf.DwarfInfo {
         .debug_line = &[0]u8{},
         .debug_line_str = &[0]u8{},
         .debug_ranges = &[0]u8{},
+        .debug_str_offsets = &[0]u8{},
+        .debug_loclists = &[0]u8{},
+        .debug_rnglists = &[0]u8{},
+        .debug_addr = &[0]u8{},
+        .debug_names = &[0]u8{},
+        .debug_frame = &[0]u8{},
     };
     for (self.sections.items) |sect| {
         const segname = sect.segName();
@@ -599,6 +605,18 @@ pub fn parseDwarfInfo(self: Object) error{Overflow}!dwarf.DwarfInfo {
             } else if (mem.eql(u8, sectname, "__debug_line_str")) {
                 di.debug_line_str = try self.getSectionContents(sect);
             } else if (mem.eql(u8, sectname, "__debug_ranges")) {
+                di.debug_ranges = try self.getSectionContents(sect);
+            } else if (mem.eql(u8, sectname, "debug_str_offsets")) {
+                di.debug_ranges = try self.getSectionContents(sect);
+            } else if (mem.eql(u8, sectname, "debug_loclists")) {
+                di.debug_ranges = try self.getSectionContents(sect);
+            } else if (mem.eql(u8, sectname, "debug_rnglists")) {
+                di.debug_ranges = try self.getSectionContents(sect);
+            } else if (mem.eql(u8, sectname, "debug_addr")) {
+                di.debug_ranges = try self.getSectionContents(sect);
+            } else if (mem.eql(u8, sectname, "debug_names")) {
+                di.debug_ranges = try self.getSectionContents(sect);
+            } else if (mem.eql(u8, sectname, "debug_frame")) {
                 di.debug_ranges = try self.getSectionContents(sect);
             }
         }
