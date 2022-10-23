@@ -50,8 +50,11 @@ atoms: std.ArrayListUnmanaged(AtomIndex) = .{},
 
 pub fn deinit(self: *Object, gpa: Allocator) void {
     self.atoms.deinit(gpa);
-    gpa.free(self.name);
-    gpa.free(self.contents);
+    // ZAR MODIFICATION:
+    // We manage memory of this ourselves in zar - so
+    // freeing this here for that does not make much sense.
+    //gpa.free(self.name);
+    //gpa.free(self.contents);
     if (self.in_symtab) |_| {
         gpa.free(self.source_symtab_lookup);
         gpa.free(self.strtab_lookup);
@@ -83,13 +86,18 @@ pub fn parse(self: *Object, allocator: Allocator, cpu_arch: std.Target.Cpu.Arch)
             return error.UnsupportedCpuArchitecture;
         },
     };
-    if (this_arch != cpu_arch) {
-        log.err("mismatched cpu architecture: expected {s}, found {s}", .{
-            @tagName(cpu_arch),
-            @tagName(this_arch),
-        });
-        return error.MismatchedCpuArchitecture;
-    }
+
+    // ZAR MODIFICATION: This check doesn't serve any purpose for the needs of
+    // zar.
+    _ = this_arch;
+    _ = cpu_arch;
+    // if (this_arch != cpu_arch) {
+    //     log.err("mismatched cpu architecture: expected {s}, found {s}", .{
+    //         @tagName(cpu_arch),
+    //         @tagName(this_arch),
+    //     });
+    //     return error.MismatchedCpuArchitecture;
+    // }
 
     var it = LoadCommandIterator{
         .ncmds = self.header.ncmds,

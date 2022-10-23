@@ -9,7 +9,7 @@ const log = std.log.scoped(.coff);
 const mem = std.mem;
 
 const Allocator = mem.Allocator;
-const Object = @import("Coff/Object.zig");
+pub const Object = @import("Coff/Object.zig");
 pub const Options = @import("Coff/Options.zig");
 const Zld = @import("Zld.zig");
 
