@@ -11,6 +11,7 @@ const ChildProcess = std.ChildProcess;
 const Target = std.Target;
 const CrossTarget = std.zig.CrossTarget;
 const tmpDir = testing.tmpDir;
+const ThreadPool = @import("ThreadPool.zig");
 const Zld = @import("Zld.zig");
 
 const gpa = testing.allocator;
@@ -321,8 +322,14 @@ pub const TestContext = struct {
                     .libs = libs,
                     .lib_dirs = &[0][]const u8{},
                 } },
+                .wasm => @panic("TODO"),
             };
-            const zld = try Zld.openPath(gpa, tag, opts);
+
+            var thread_pool: ThreadPool = undefined;
+            try thread_pool.init(gpa);
+            defer thread_pool.deinit();
+
+            const zld = try Zld.openPath(gpa, tag, opts, &thread_pool);
             defer zld.deinit();
 
             var argv = std.ArrayList([]const u8).init(arena);

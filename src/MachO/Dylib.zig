@@ -22,7 +22,14 @@ weak: bool = false,
 /// Parsed symbol table represented as hash map of symbols'
 /// names. We can and should defer creating *Symbols until
 /// a symbol is referenced by an object file.
-symbols: std.StringArrayHashMapUnmanaged(void) = .{},
+///
+/// The value for each parsed symbol represents whether the
+/// symbol is defined as a weak symbol or strong.
+/// TODO when the referenced symbol is weak, ld64 marks it as
+/// N_REF_TO_WEAK but need to investigate if there's more to it
+/// such as weak binding entry or simply weak. For now, we generate
+/// standard bind or lazy bind.
+symbols: std.StringArrayHashMapUnmanaged(bool) = .{},
 
 pub const Id = struct {
     name: []const u8,
@@ -162,6 +169,8 @@ pub fn parseFromBinary(
                 const symtab_cmd = cmd.cast(macho.symtab_command).?;
                 const symtab = @ptrCast(
                     [*]const macho.nlist_64,
+                    // Alignment is guaranteed as a dylib is a final linked image and has to have sections
+                    // properly aligned in order to be correctly loaded by the loader.
                     @alignCast(@alignOf(macho.nlist_64), &data[symtab_cmd.symoff]),
                 )[0..symtab_cmd.nsyms];
                 const strtab = data[symtab_cmd.stroff..][0..symtab_cmd.strsize];
@@ -171,7 +180,7 @@ pub fn parseFromBinary(
                     if (!add_to_symtab) continue;
 
                     const sym_name = mem.sliceTo(@ptrCast([*:0]const u8, strtab.ptr + sym.n_strx), 0);
-                    try self.symbols.putNoClobber(allocator, try allocator.dupe(u8, sym_name), {});
+                    try self.symbols.putNoClobber(allocator, try allocator.dupe(u8, sym_name), false);
                 }
             },
             .ID_DYLIB => {
@@ -210,25 +219,30 @@ fn addObjCClassSymbol(self: *Dylib, allocator: Allocator, sym_name: []const u8) 
 
     for (expanded) |sym| {
         if (self.symbols.contains(sym)) continue;
-        try self.symbols.putNoClobber(allocator, sym, {});
+        try self.symbols.putNoClobber(allocator, sym, false);
     }
 }
 
 fn addObjCIVarSymbol(self: *Dylib, allocator: Allocator, sym_name: []const u8) !void {
     const expanded = try std.fmt.allocPrint(allocator, "_OBJC_IVAR_$_{s}", .{sym_name});
     if (self.symbols.contains(expanded)) return;
-    try self.symbols.putNoClobber(allocator, expanded, {});
+    try self.symbols.putNoClobber(allocator, expanded, false);
 }
 
 fn addObjCEhTypeSymbol(self: *Dylib, allocator: Allocator, sym_name: []const u8) !void {
     const expanded = try std.fmt.allocPrint(allocator, "_OBJC_EHTYPE_$_{s}", .{sym_name});
     if (self.symbols.contains(expanded)) return;
-    try self.symbols.putNoClobber(allocator, expanded, {});
+    try self.symbols.putNoClobber(allocator, expanded, false);
 }
 
 fn addSymbol(self: *Dylib, allocator: Allocator, sym_name: []const u8) !void {
     if (self.symbols.contains(sym_name)) return;
-    try self.symbols.putNoClobber(allocator, try allocator.dupe(u8, sym_name), {});
+    try self.symbols.putNoClobber(allocator, try allocator.dupe(u8, sym_name), false);
+}
+
+fn addWeakSymbol(self: *Dylib, allocator: Allocator, sym_name: []const u8) !void {
+    if (self.symbols.contains(sym_name)) return;
+    try self.symbols.putNoClobber(allocator, try allocator.dupe(u8, sym_name), true);
 }
 
 const TargetMatcher = struct {
@@ -363,6 +377,12 @@ pub fn parseFromStub(
                             }
                         }
 
+                        if (exp.weak_symbols) |symbols| {
+                            for (symbols) |sym_name| {
+                                try self.addWeakSymbol(allocator, sym_name);
+                            }
+                        }
+
                         if (exp.objc_classes) |objc_classes| {
                             for (objc_classes) |class_name| {
                                 try self.addObjCClassSymbol(allocator, class_name);
@@ -406,6 +426,12 @@ pub fn parseFromStub(
                             }
                         }
 
+                        if (exp.weak_symbols) |symbols| {
+                            for (symbols) |sym_name| {
+                                try self.addWeakSymbol(allocator, sym_name);
+                            }
+                        }
+
                         if (exp.objc_classes) |classes| {
                             for (classes) |sym_name| {
                                 try self.addObjCClassSymbol(allocator, sym_name);
@@ -433,6 +459,12 @@ pub fn parseFromStub(
                         if (reexp.symbols) |symbols| {
                             for (symbols) |sym_name| {
                                 try self.addSymbol(allocator, sym_name);
+                            }
+                        }
+
+                        if (reexp.weak_symbols) |symbols| {
+                            for (symbols) |sym_name| {
+                                try self.addWeakSymbol(allocator, sym_name);
                             }
                         }
 

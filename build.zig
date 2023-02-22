@@ -11,26 +11,56 @@ const Step = std.build.Step;
 
 pub fn build(b: *Builder) void {
     const target = b.standardTargetOptions(.{});
-    const mode = b.standardReleaseOptions();
+    const mode = b.standardOptimizeOption(.{});
 
     const enable_logging = b.option(bool, "log", "Whether to enable logging") orelse false;
     const is_qemu_enabled = b.option(bool, "enable-qemu", "Use QEMU to run cross compiled foreign architecture tests") orelse false;
+    const enable_tracy = b.option([]const u8, "tracy", "Enable Tracy integration. Supply path to Tracy source");
 
-    const lib = b.addStaticLibrary("zld", "src/Zld.zig");
-    lib.setTarget(target);
-    lib.setBuildMode(mode);
-    lib.addPackagePath("dis_x86_64", "zig-dis-x86_64/src/dis_x86_64.zig");
+    b.addModule(.{
+        .name = "dis_x86_64",
+        .source_file = .{ .path = "zig-dis-x86_64/src/dis_x86_64.zig" },
+    });
+    const dis_x86_64 = b.modules.get("dis_x86_64").?;
 
-    const exe = b.addExecutable("zld", "src/main.zig");
-    exe.setTarget(target);
-    exe.setBuildMode(mode);
-    exe.addPackagePath("dis_x86_64", "zig-dis-x86_64/src/dis_x86_64.zig");
+    const exe = b.addExecutable(.{
+        .name = "zld",
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = mode,
+    });
+    exe.addModule("dis_x86_64", dis_x86_64);
     exe.linkLibC();
-    exe.strip = false;
 
     const exe_opts = b.addOptions();
     exe.addOptions("build_options", exe_opts);
     exe_opts.addOption(bool, "enable_logging", enable_logging);
+    exe_opts.addOption(bool, "enable_tracy", enable_tracy != null);
+
+    if (enable_tracy) |tracy_path| {
+        const client_cpp = fs.path.join(
+            b.allocator,
+            &[_][]const u8{ tracy_path, "TracyClient.cpp" },
+        ) catch unreachable;
+
+        // On mingw, we need to opt into windows 7+ to get some features required by tracy.
+        const tracy_c_flags: []const []const u8 = if (target.isWindows() and target.getAbi() == .gnu)
+            &[_][]const u8{ "-DTRACY_ENABLE=1", "-fno-sanitize=undefined", "-D_WIN32_WINNT=0x601" }
+        else
+            &[_][]const u8{ "-DTRACY_ENABLE=1", "-fno-sanitize=undefined" };
+
+        exe.addIncludePath(tracy_path);
+        // TODO: upstream bug
+        exe.addSystemIncludePath("/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include");
+        exe.addCSourceFile(client_cpp, tracy_c_flags);
+        exe.linkSystemLibraryName("c++");
+        exe.strip = false;
+
+        if (target.isWindows()) {
+            exe.linkSystemLibrary("dbghelp");
+            exe.linkSystemLibrary("ws2_32");
+        }
+    }
     exe.install();
 
     const gen_symlinks = symlinks(exe, &[_][]const u8{
@@ -38,13 +68,19 @@ pub fn build(b: *Builder) void {
         "ld",
         "ld64.zld",
         "ld64",
+        "wasm-zld",
     });
     gen_symlinks.step.dependOn(&exe.step);
 
-    const tests = b.addTest("src/test.zig");
-    tests.setBuildMode(mode);
-    tests.addPackagePath("end_to_end_tests", "test/test.zig");
-    tests.addPackagePath("dis_x86_64", "zig-dis-x86_64/src/dis_x86_64.zig");
+    const tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/test.zig" },
+        .optimize = mode,
+    });
+    const test_base = b.createModule(.{ .source_file = .{ .path = "src/test.zig" } });
+    const e2e_tests = b.createModule(.{ .source_file = .{ .path = "test/test.zig" } });
+    e2e_tests.dependencies.put("test_base", test_base) catch @panic("OOM");
+    tests.addModule("end_to_end_tests", e2e_tests);
+    tests.addModule("dis_x86_64", dis_x86_64);
 
     const test_opts = b.addOptions();
     tests.addOptions("build_options", test_opts);

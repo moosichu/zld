@@ -61,7 +61,6 @@ pub fn genSubprogramLookupByName(
 
             while (try attr_it.next()) |attr| switch (attr.name) {
                 dwarf.AT.name => if (attr.getString(self, compile_unit.cuh)) |str| {
-                    log.warn("subprogram: {s}", .{str});
                     name = str;
                 },
                 dwarf.AT.low_pc => {
@@ -182,7 +181,7 @@ const AbbrevEntryIterator = struct {
         self.pos += creader.bytes_read;
 
         if (kind == 0) {
-            return AbbrevEntry.@"null"();
+            return AbbrevEntry.null();
         }
 
         const abbrev_pos = lookup.get(kind) orelse return error.MalformedDwarf;
@@ -254,13 +253,21 @@ pub const Attribute = struct {
     }
 
     pub fn getString(self: Attribute, ctx: DwarfInfo, cuh: CompileUnit.Header) ?[]const u8 {
-        if (self.form != dwarf.FORM.strp) return null;
         const debug_info = self.getDebugInfo(ctx);
-        const off = if (cuh.is_64bit)
-            mem.readIntLittle(u64, debug_info[0..8])
-        else
-            mem.readIntLittle(u32, debug_info[0..4]);
-        return ctx.getString(off);
+
+        switch (self.form) {
+            dwarf.FORM.string => {
+                return mem.sliceTo(@ptrCast([*:0]const u8, debug_info.ptr), 0);
+            },
+            dwarf.FORM.strp => {
+                const off = if (cuh.is_64bit)
+                    mem.readIntLittle(u64, debug_info[0..8])
+                else
+                    mem.readIntLittle(u32, debug_info[0..4]);
+                return ctx.getString(off);
+            },
+            else => return null,
+        }
     }
 
     pub fn getConstant(self: Attribute, ctx: DwarfInfo) !?i128 {
@@ -382,44 +389,88 @@ fn findFormSize(self: DwarfInfo, form: u64, di_off: usize, cuh: CompileUnit.Head
     var creader = std.io.countingReader(stream.reader());
     const reader = creader.reader();
 
-    return switch (form) {
-        dwarf.FORM.strp => if (cuh.is_64bit) @sizeOf(u64) else @sizeOf(u32),
-        dwarf.FORM.sec_offset => if (cuh.is_64bit) @sizeOf(u64) else @sizeOf(u32),
-        dwarf.FORM.addr => cuh.address_size,
-        dwarf.FORM.exprloc => blk: {
+    switch (form) {
+        dwarf.FORM.strp,
+        dwarf.FORM.sec_offset,
+        dwarf.FORM.ref_addr,
+        => return if (cuh.is_64bit) @sizeOf(u64) else @sizeOf(u32),
+
+        dwarf.FORM.addr => return cuh.address_size,
+
+        dwarf.FORM.block1,
+        dwarf.FORM.block2,
+        dwarf.FORM.block4,
+        dwarf.FORM.block,
+        => {
+            const len: u64 = switch (form) {
+                dwarf.FORM.block1 => try reader.readIntLittle(u8),
+                dwarf.FORM.block2 => try reader.readIntLittle(u16),
+                dwarf.FORM.block4 => try reader.readIntLittle(u32),
+                dwarf.FORM.block => try leb.readULEB128(u64, reader),
+                else => unreachable,
+            };
+            var i: u64 = 0;
+            while (i < len) : (i += 1) {
+                _ = try reader.readByte();
+            }
+            return creader.bytes_read;
+        },
+
+        dwarf.FORM.exprloc => {
             const expr_len = try leb.readULEB128(u64, reader);
             var i: u64 = 0;
             while (i < expr_len) : (i += 1) {
                 _ = try reader.readByte();
             }
-            break :blk creader.bytes_read;
+            return creader.bytes_read;
         },
-        dwarf.FORM.flag_present => 0,
+        dwarf.FORM.flag_present => return 0,
 
-        dwarf.FORM.data1 => @sizeOf(u8),
-        dwarf.FORM.data2 => @sizeOf(u16),
-        dwarf.FORM.data4 => @sizeOf(u32),
-        dwarf.FORM.data8 => @sizeOf(u64),
-        dwarf.FORM.udata => blk: {
+        dwarf.FORM.data1,
+        dwarf.FORM.ref1,
+        dwarf.FORM.flag,
+        => return @sizeOf(u8),
+
+        dwarf.FORM.data2,
+        dwarf.FORM.ref2,
+        => return @sizeOf(u16),
+
+        dwarf.FORM.data4,
+        dwarf.FORM.ref4,
+        => return @sizeOf(u32),
+
+        dwarf.FORM.data8,
+        dwarf.FORM.ref8,
+        dwarf.FORM.ref_sig8,
+        => return @sizeOf(u64),
+
+        dwarf.FORM.udata,
+        dwarf.FORM.ref_udata,
+        => {
             _ = try leb.readULEB128(u64, reader);
-            break :blk creader.bytes_read;
+            return creader.bytes_read;
         },
-        dwarf.FORM.sdata => blk: {
+
+        dwarf.FORM.sdata => {
             _ = try leb.readILEB128(i64, reader);
-            break :blk creader.bytes_read;
+            return creader.bytes_read;
         },
 
-        dwarf.FORM.ref1 => @sizeOf(u8),
-        dwarf.FORM.ref2 => @sizeOf(u16),
-        dwarf.FORM.ref4 => @sizeOf(u32),
-        dwarf.FORM.ref8 => @sizeOf(u64),
-        dwarf.FORM.ref_udata => blk: {
-            _ = try leb.readULEB128(u64, reader);
-            break :blk creader.bytes_read;
+        dwarf.FORM.string => {
+            var count: usize = 0;
+            while (true) {
+                const byte = try reader.readByte();
+                count += 1;
+                if (byte == 0x0) break;
+            }
+            return count;
         },
 
-        else => return error.ToDo,
-    };
+        else => {
+            log.err("unhandled DW_FORM_* value with identifier {x}", .{form});
+            return error.UnhandledDwFormValue;
+        },
+    }
 }
 
 fn findAbbrevEntrySize(self: DwarfInfo, da_off: usize, da_len: usize, di_off: usize, cuh: CompileUnit.Header) !usize {
@@ -429,7 +480,7 @@ fn findAbbrevEntrySize(self: DwarfInfo, da_off: usize, da_len: usize, di_off: us
     const reader = creader.reader();
 
     const tag = try leb.readULEB128(u64, reader);
-    _ = switch (tag) {
+    switch (tag) {
         std.dwarf.TAG.const_type,
         std.dwarf.TAG.packed_type,
         std.dwarf.TAG.pointer_type,
@@ -438,9 +489,11 @@ fn findAbbrevEntrySize(self: DwarfInfo, da_off: usize, da_len: usize, di_off: us
         std.dwarf.TAG.rvalue_reference_type,
         std.dwarf.TAG.shared_type,
         std.dwarf.TAG.volatile_type,
-        => if (creader.bytes_read != da_len) try reader.readByte(),
-        else => try reader.readByte(),
-    };
+        => if (creader.bytes_read != da_len) {
+            _ = try reader.readByte();
+        },
+        else => _ = try reader.readByte(),
+    }
 
     var len: usize = 0;
     while (creader.bytes_read < debug_abbrev.len) {
