@@ -317,7 +317,7 @@ pub fn flush(self: *MachO) !void {
         .unresolved = std.AutoArrayHashMap(u32, void).init(arena),
     };
 
-    for (self.objects.items) |_, object_id| {
+    for (self.objects.items, 0..) |_, object_id| {
         try self.resolveSymbolsInObject(@intCast(u16, object_id), &resolver);
     }
 
@@ -347,12 +347,12 @@ pub fn flush(self: *MachO) !void {
         self.entry_index = global_index;
     }
 
-    for (self.objects.items) |*object, object_id| {
+    for (self.objects.items, 0..) |*object, object_id| {
         try object.splitIntoAtoms(self, @intCast(u31, object_id));
     }
 
     var reverse_lookups: [][]u32 = try arena.alloc([]u32, self.objects.items.len);
-    for (self.objects.items) |object, i| {
+    for (self.objects.items, 0..) |object, i| {
         reverse_lookups[i] = try object.createReverseSymbolLookup(arena);
     }
 
@@ -812,7 +812,7 @@ fn parseLibs(
     syslibroot: ?[]const u8,
     dependent_libs: anytype,
 ) !void {
-    for (lib_names) |lib, i| {
+    for (lib_names, 0..) |lib, i| {
         const lib_info = lib_infos[i];
         log.debug("parsing lib path '{s}'", .{lib});
         if (try self.parseDylib(lib, dependent_libs, .{
@@ -904,7 +904,7 @@ pub fn getOutputSection(self: *MachO, sect: macho.section_64) !?u8 {
             break :blk null;
         }
 
-        switch (sect.@"type"()) {
+        switch (sect.type()) {
             macho.S_4BYTE_LITERALS,
             macho.S_8BYTE_LITERALS,
             macho.S_16BYTE_LITERALS,
@@ -1583,7 +1583,7 @@ fn resolveSymbolsInDylibs(self: *MachO, resolver: *SymbolResolver) !void {
         const sym = self.getSymbolPtr(global);
         const sym_name = self.getSymbolName(global);
 
-        for (self.dylibs.items) |dylib, id| {
+        for (self.dylibs.items, 0..) |dylib, id| {
             if (!dylib.symbols.contains(sym_name)) continue;
 
             const dylib_id = @intCast(u16, id);
@@ -1710,7 +1710,7 @@ fn resolveDyldStubBinder(self: *MachO, resolver: *SymbolResolver) !void {
     const global = SymbolWithLoc{ .sym_index = sym_index };
     try self.globals.append(gpa, global);
 
-    for (self.dylibs.items) |dylib, id| {
+    for (self.dylibs.items, 0..) |dylib, id| {
         if (!dylib.symbols.contains(sym_name)) continue;
 
         const dylib_id = @intCast(u16, id);
@@ -1993,7 +1993,7 @@ fn createSegments(self: *MachO) !void {
         });
     }
 
-    for (self.sections.items(.header)) |header, sect_id| {
+    for (self.sections.items(.header), 0..) |header, sect_id| {
         if (header.size == 0) continue; // empty section
 
         const segname = header.segName();
@@ -2176,7 +2176,7 @@ fn writeAtoms(self: *MachO, reverse_lookups: [][]u32) !void {
     const gpa = self.base.allocator;
     const slice = self.sections.slice();
 
-    for (slice.items(.first_atom_index)) |first_atom_index, sect_id| {
+    for (slice.items(.first_atom_index), 0..) |first_atom_index, sect_id| {
         const header = slice.items(.header)[sect_id];
         var atom_index = first_atom_index;
 
@@ -2217,7 +2217,7 @@ fn writeAtoms(self: *MachO, reverse_lookups: [][]u32) !void {
                         break :outer;
                     }
                 }
-                switch (header.@"type"()) {
+                switch (header.type()) {
                     macho.S_NON_LAZY_SYMBOL_POINTERS => {
                         try self.writeGotPointer(count, buffer.writer());
                     },
@@ -2234,7 +2234,7 @@ fn writeAtoms(self: *MachO, reverse_lookups: [][]u32) !void {
                                 break :outer;
                             }
                         }
-                        if (header.@"type"() == macho.S_SYMBOL_STUBS) {
+                        if (header.type() == macho.S_SYMBOL_STUBS) {
                             try self.writeStubCode(atom_index, count, buffer.writer());
                         } else if (mem.eql(u8, header.sectName(), "__stub_helper")) {
                             try self.writeStubHelperCode(atom_index, buffer.writer());
@@ -2314,10 +2314,10 @@ fn pruneAndSortSections(self: *MachO) !void {
 
 fn calcSectionSizes(self: *MachO, reverse_lookups: [][]u32) !void {
     const slice = self.sections.slice();
-    for (slice.items(.header)) |*header, sect_id| {
+    for (slice.items(.header), 0..) |*header, sect_id| {
         if (header.size == 0) continue;
         if (self.requiresThunks()) {
-            if (header.isCode() and !(header.@"type"() == macho.S_SYMBOL_STUBS) and !mem.eql(u8, header.sectName(), "__stub_helper")) continue;
+            if (header.isCode() and !(header.type() == macho.S_SYMBOL_STUBS) and !mem.eql(u8, header.sectName(), "__stub_helper")) continue;
         }
 
         var atom_index = slice.items(.first_atom_index)[sect_id];
@@ -2343,9 +2343,9 @@ fn calcSectionSizes(self: *MachO, reverse_lookups: [][]u32) !void {
     }
 
     if (self.requiresThunks()) {
-        for (slice.items(.header)) |header, sect_id| {
+        for (slice.items(.header), 0..) |header, sect_id| {
             if (!header.isCode()) continue;
-            if (header.@"type"() == macho.S_SYMBOL_STUBS) continue;
+            if (header.type() == macho.S_SYMBOL_STUBS) continue;
             if (mem.eql(u8, header.sectName(), "__stub_helper")) continue;
 
             // Create jump/branch range extenders if needed.
@@ -2355,7 +2355,7 @@ fn calcSectionSizes(self: *MachO, reverse_lookups: [][]u32) !void {
 }
 
 fn allocateSegments(self: *MachO) !void {
-    for (self.segments.items) |*segment, segment_index| {
+    for (self.segments.items, 0..) |*segment, segment_index| {
         const is_text_segment = mem.eql(u8, segment.segName(), "__TEXT");
         const base_size = if (is_text_segment) try self.calcMinHeaderPad() else 0;
         try self.allocateSegment(@intCast(u8, segment_index), base_size);
@@ -2417,7 +2417,7 @@ fn allocateSegment(self: *MachO, segment_index: u8, init_size: u64) !void {
     var start = init_size;
 
     const slice = self.sections.slice();
-    for (slice.items(.header)[indexes.start..indexes.end]) |*header, sect_id| {
+    for (slice.items(.header)[indexes.start..indexes.end], 0..) |*header, sect_id| {
         var atom_index = slice.items(.first_atom_index)[indexes.start + sect_id];
 
         const alignment = try math.powi(u32, 2, header.@"align");
@@ -2537,10 +2537,10 @@ inline fn getSectionPrecedence(header: macho.section_64) u8 {
     const section_precedence: u4 = blk: {
         if (header.isCode()) {
             if (mem.eql(u8, "__text", header.sectName())) break :blk 0x0;
-            if (header.@"type"() == macho.S_SYMBOL_STUBS) break :blk 0x1;
+            if (header.type() == macho.S_SYMBOL_STUBS) break :blk 0x1;
             break :blk 0x2;
         }
-        switch (header.@"type"()) {
+        switch (header.type()) {
             macho.S_NON_LAZY_SYMBOL_POINTERS,
             macho.S_LAZY_SYMBOL_POINTERS,
             => break :blk 0x0,
@@ -2559,7 +2559,7 @@ inline fn getSectionPrecedence(header: macho.section_64) u8 {
 }
 
 fn writeSegmentHeaders(self: *MachO, ncmds: *u32, writer: anytype) !void {
-    for (self.segments.items) |seg, i| {
+    for (self.segments.items, 0..) |seg, i| {
         const indexes = self.getSectionIndexes(@intCast(u8, i));
         var out_seg = seg;
         out_seg.cmdsize = @sizeOf(macho.segment_command_64);
@@ -2663,8 +2663,8 @@ fn collectRebaseData(self: *MachO, pointers: *std.ArrayList(bind.Pointer)) !void
     }
 
     // Finally, unpack the rest.
-    for (slice.items(.header)) |header, sect_id| {
-        switch (header.@"type"()) {
+    for (slice.items(.header), 0..) |header, sect_id| {
+        switch (header.type()) {
             macho.S_LITERAL_POINTERS,
             macho.S_REGULAR,
             macho.S_MOD_INIT_FUNC_POINTERS,
@@ -2794,8 +2794,8 @@ fn collectBindData(self: *MachO, pointers: *std.ArrayList(bind.Pointer), reverse
 
     // Finally, unpack the rest.
     const slice = self.sections.slice();
-    for (slice.items(.header)) |header, sect_id| {
-        switch (header.@"type"()) {
+    for (slice.items(.header), 0..) |header, sect_id| {
+        switch (header.type()) {
             macho.S_LITERAL_POINTERS,
             macho.S_REGULAR,
             macho.S_MOD_INIT_FUNC_POINTERS,
@@ -3654,7 +3654,7 @@ pub inline fn getAtom(self: MachO, atom_index: AtomIndex) Atom {
 }
 
 fn getSegmentByName(self: MachO, segname: []const u8) ?u8 {
-    for (self.segments.items) |seg, i| {
+    for (self.segments.items, 0..) |seg, i| {
         if (mem.eql(u8, segname, seg.segName())) return @intCast(u8, i);
     } else return null;
 }
@@ -3678,7 +3678,7 @@ pub inline fn getLinkeditSegmentPtr(self: *MachO) *macho.segment_command_64 {
 
 pub fn getSectionByName(self: MachO, segname: []const u8, sectname: []const u8) ?u8 {
     // TODO investigate caching with a hashmap
-    for (self.sections.items(.header)) |header, i| {
+    for (self.sections.items(.header), 0..) |header, i| {
         if (mem.eql(u8, header.segName(), segname) and mem.eql(u8, header.sectName(), sectname))
             return @intCast(u8, i);
     } else return null;
@@ -3686,7 +3686,7 @@ pub fn getSectionByName(self: MachO, segname: []const u8, sectname: []const u8) 
 
 pub fn getSectionIndexes(self: MachO, segment_index: u8) struct { start: u8, end: u8 } {
     var start: u8 = 0;
-    const nsects = for (self.segments.items) |seg, i| {
+    const nsects = for (self.segments.items, 0..) |seg, i| {
         if (i == segment_index) break @intCast(u8, seg.nsects);
         start += @intCast(u8, seg.nsects);
     } else 0;
@@ -4004,7 +4004,7 @@ fn generateSymbolStabsForSymbol(
 
 fn logSegments(self: *MachO) void {
     log.debug("segments:", .{});
-    for (self.segments.items) |segment, i| {
+    for (self.segments.items, 0..) |segment, i| {
         log.debug("  segment({d}): {s} @{x} ({x}), sizeof({x})", .{
             i,
             segment.segName(),
@@ -4017,7 +4017,7 @@ fn logSegments(self: *MachO) void {
 
 fn logSections(self: *MachO) void {
     log.debug("sections:", .{});
-    for (self.sections.items(.header)) |header, i| {
+    for (self.sections.items(.header), 0..) |header, i| {
         log.debug("  sect({d}): {s},{s} @{x} ({x}), sizeof({x})", .{
             i + 1,
             header.segName(),
@@ -4055,9 +4055,9 @@ fn logSymtab(self: *MachO) void {
     const scoped_log = std.log.scoped(.symtab);
 
     scoped_log.debug("locals:", .{});
-    for (self.objects.items) |object, id| {
+    for (self.objects.items, 0..) |object, id| {
         scoped_log.debug("  object({d}): {s}", .{ id, object.name });
-        for (object.symtab) |sym, sym_id| {
+        for (object.symtab, 0..) |sym, sym_id| {
             if (object.in_symtab == null) continue;
             mem.set(u8, &buf, '_');
             scoped_log.debug("    %{d}: {s} @{x} in sect({d}), {s}", .{
@@ -4070,7 +4070,7 @@ fn logSymtab(self: *MachO) void {
         }
     }
     scoped_log.debug("  object(-1)", .{});
-    for (self.locals.items) |sym, sym_id| {
+    for (self.locals.items, 0..) |sym, sym_id| {
         if (sym.undf()) continue;
         scoped_log.debug("    %{d}: {s} @{x} in sect({d}), {s}", .{
             sym_id,
@@ -4082,7 +4082,7 @@ fn logSymtab(self: *MachO) void {
     }
 
     scoped_log.debug("exports:", .{});
-    for (self.globals.items) |global, i| {
+    for (self.globals.items, 0..) |global, i| {
         const sym = self.getSymbol(global);
         if (sym.undf()) continue;
         if (sym.n_desc == N_DEAD) continue;
@@ -4097,7 +4097,7 @@ fn logSymtab(self: *MachO) void {
     }
 
     scoped_log.debug("imports:", .{});
-    for (self.globals.items) |global, i| {
+    for (self.globals.items, 0..) |global, i| {
         const sym = self.getSymbol(global);
         if (!sym.undf()) continue;
         if (sym.n_desc == N_DEAD) continue;
@@ -4112,7 +4112,7 @@ fn logSymtab(self: *MachO) void {
     }
 
     scoped_log.debug("GOT entries:", .{});
-    for (self.got_entries.items) |entry, i| {
+    for (self.got_entries.items, 0..) |entry, i| {
         const atom_sym = entry.getAtomSymbol(self);
         const target_sym = entry.getTargetSymbol(self);
         const target_sym_name = entry.getTargetSymbolName(self);
@@ -4134,7 +4134,7 @@ fn logSymtab(self: *MachO) void {
     }
 
     scoped_log.debug("__thread_ptrs entries:", .{});
-    for (self.tlv_ptr_entries.items) |entry, i| {
+    for (self.tlv_ptr_entries.items, 0..) |entry, i| {
         const atom_sym = entry.getAtomSymbol(self);
         const target_sym = entry.getTargetSymbol(self);
         const target_sym_name = entry.getTargetSymbolName(self);
@@ -4147,7 +4147,7 @@ fn logSymtab(self: *MachO) void {
     }
 
     scoped_log.debug("stubs entries:", .{});
-    for (self.stubs.items) |entry, i| {
+    for (self.stubs.items, 0..) |entry, i| {
         const atom_sym = entry.getAtomSymbol(self);
         const target_sym = entry.getTargetSymbol(self);
         const target_sym_name = entry.getTargetSymbolName(self);
@@ -4160,9 +4160,9 @@ fn logSymtab(self: *MachO) void {
     }
 
     scoped_log.debug("thunks:", .{});
-    for (self.thunks.items) |thunk, i| {
+    for (self.thunks.items, 0..) |thunk, i| {
         scoped_log.debug("  thunk({d})", .{i});
-        for (thunk.lookup.keys()) |target, j| {
+        for (thunk.lookup.keys(), 0..) |target, j| {
             const target_sym = self.getSymbol(target);
             const atom = self.getAtom(thunk.lookup.get(target).?);
             const atom_sym = self.getSymbol(atom.getSymbolWithLoc());
@@ -4179,7 +4179,7 @@ fn logSymtab(self: *MachO) void {
 fn logAtoms(self: *MachO) void {
     log.debug("atoms:", .{});
     const slice = self.sections.slice();
-    for (slice.items(.first_atom_index)) |first_atom_index, sect_id| {
+    for (slice.items(.first_atom_index), 0..) |first_atom_index, sect_id| {
         var atom_index = first_atom_index;
         const header = slice.items(.header)[sect_id];
 

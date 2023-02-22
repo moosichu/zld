@@ -141,7 +141,7 @@ pub fn parse(self: *Object, allocator: Allocator, cpu_arch: std.Target.Cpu.Arch)
                 var sorted_all_syms = try std.ArrayList(SymbolAtIndex).initCapacity(allocator, self.in_symtab.?.len);
                 defer sorted_all_syms.deinit();
 
-                for (self.in_symtab.?) |_, index| {
+                for (self.in_symtab.?, 0..) |_, index| {
                     sorted_all_syms.appendAssumeCapacity(.{ .index = @intCast(u32, index) });
                 }
 
@@ -151,7 +151,7 @@ pub fn parse(self: *Object, allocator: Allocator, cpu_arch: std.Target.Cpu.Arch)
                 // is kind enough to specify the symbols in the correct order.
                 sort.sort(SymbolAtIndex, sorted_all_syms.items, self, SymbolAtIndex.lessThan);
 
-                for (sorted_all_syms.items) |sym_id, i| {
+                for (sorted_all_syms.items, 0..) |sym_id, i| {
                     const sym = sym_id.getSymbol(self);
 
                     self.symtab[i] = sym;
@@ -292,7 +292,7 @@ pub fn splitIntoAtoms(self: *Object, macho_file: *MachO, object_id: u31) !void {
     log.debug("splitting object({d}, {s}) into atoms", .{ object_id, self.name });
 
     const sections = self.getSourceSections();
-    for (sections) |sect, id| {
+    for (sections, 0..) |sect, id| {
         if (sect.isDebug()) continue;
         const out_sect_id = (try macho_file.getOutputSection(sect)) orelse {
             log.debug("  unhandled section '{s},{s}'", .{ sect.segName(), sect.sectName() });
@@ -312,7 +312,7 @@ pub fn splitIntoAtoms(self: *Object, macho_file: *MachO, object_id: u31) !void {
     }
 
     if (self.in_symtab == null) {
-        for (sections) |sect, id| {
+        for (sections, 0..) |sect, id| {
             if (sect.isDebug()) continue;
             const out_sect_id = (try macho_file.getOutputSection(sect)) orelse continue;
             if (sect.size == 0) continue;
@@ -358,7 +358,7 @@ pub fn splitIntoAtoms(self: *Object, macho_file: *MachO, object_id: u31) !void {
     var sorted_sections = try gpa.alloc(SortedSection, sections.len);
     defer gpa.free(sorted_sections);
 
-    for (sections) |sect, id| {
+    for (sections, 0..) |sect, id| {
         sorted_sections[id] = .{ .header = sect, .id = @intCast(u8, id) };
     }
 
@@ -526,7 +526,7 @@ pub fn getSourceSymbol(self: Object, index: u32) ?macho.nlist_64 {
 pub fn createReverseSymbolLookup(self: Object, arena: Allocator) ![]u32 {
     const symtab = self.in_symtab orelse return &[0]u32{};
     const lookup = try arena.alloc(u32, symtab.len);
-    for (self.source_symtab_lookup) |source_id, id| {
+    for (self.source_symtab_lookup, 0..) |source_id, id| {
         lookup[source_id] = @intCast(u32, id);
     }
     return lookup;
