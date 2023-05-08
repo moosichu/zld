@@ -131,8 +131,8 @@ pub fn parse(self: *Object, allocator: Allocator, cpu_arch: std.Target.Cpu.Arch)
                     };
                 }
 
-                mem.set(i64, self.globals_lookup, -1);
-                mem.set(AtomIndex, self.atom_by_index_table, 0);
+                @memset(self.globals_lookup, -1);
+                @memset(self.atom_by_index_table, 0);
 
                 // You would expect that the symbol table is at least pre-sorted based on symbol's type:
                 // local < extern defined < undefined. Unfortunately, this is not guaranteed! For instance,

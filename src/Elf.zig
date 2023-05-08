@@ -332,7 +332,7 @@ fn populateMetadata(self: *Elf) !void {
         // OS ABI, often set to 0 regardless of target platform
         // ABI Version, possibly used by glibc but not by static executables
         // padding
-        mem.set(u8, header.e_ident[7..][0..9], 0);
+        @memset(header.e_ident[7..][0..9], 0);
         self.header = header;
     }
     if (self.phdr_seg_index == null) {
@@ -896,7 +896,7 @@ pub fn createGotAtom(self: *Elf, target: SymbolWithLoc) !*Atom {
 
     var code = try self.base.allocator.alloc(u8, @sizeOf(u64));
     defer self.base.allocator.free(code);
-    mem.set(u8, code, 0);
+    @memset(code, 0);
     try atom.code.appendSlice(self.base.allocator, code);
 
     const tsym_name = self.getSymbolName(target);
@@ -1231,7 +1231,7 @@ fn writeAtoms(self: *Elf) !void {
 
         var buffer = try self.base.allocator.alloc(u8, shdr.sh_size);
         defer self.base.allocator.free(buffer);
-        mem.set(u8, buffer, 0);
+        @memset(buffer, 0);
 
         while (true) {
             const sym = atom.getSymbol(self);

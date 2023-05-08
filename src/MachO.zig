@@ -420,7 +420,7 @@ pub fn flush(self: *MachO) !void {
             });
             var padding = try self.base.allocator.alloc(u8, physical_zerofill_size);
             defer self.base.allocator.free(padding);
-            mem.set(u8, padding, 0);
+            @memset(padding, 0);
             try self.base.file.pwriteAll(padding, physical_zerofill_start);
         }
     }
@@ -3022,7 +3022,7 @@ fn writeDyldInfoData(self: *MachO, ncmds: *u32, lc_writer: anytype, reverse_look
 
     var buffer = try gpa.alloc(u8, needed_size);
     defer gpa.free(buffer);
-    mem.set(u8, buffer, 0);
+    @memset(buffer, 0);
 
     var stream = std.io.fixedBufferStream(buffer);
     const writer = stream.writer();
@@ -4059,7 +4059,7 @@ fn logSymtab(self: *MachO) void {
         scoped_log.debug("  object({d}): {s}", .{ id, object.name });
         for (object.symtab, 0..) |sym, sym_id| {
             if (object.in_symtab == null) continue;
-            mem.set(u8, &buf, '_');
+            @memset(&buf, '_');
             scoped_log.debug("    %{d}: {s} @{x} in sect({d}), {s}", .{
                 sym_id,
                 object.getSymbolName(@intCast(u32, sym_id)),
