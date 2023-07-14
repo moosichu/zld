@@ -109,7 +109,7 @@ fn calcLCsSize(gpa: Allocator, options: *const Options, ctx: CalcLCsSizeCtx, ass
         }
     }
 
-    return @intCast(u32, sizeofcmds);
+    return @as(u32, @intCast(sizeofcmds));
 }
 
 pub fn calcMinHeaderPad(gpa: Allocator, options: *const Options, ctx: CalcLCsSizeCtx) !u64 {
@@ -135,7 +135,7 @@ pub fn calcNumOfLCs(lc_buffer: []const u8) u32 {
     var pos: usize = 0;
     while (true) {
         if (pos >= lc_buffer.len) break;
-        const cmd = @ptrCast(*align(1) const macho.load_command, lc_buffer.ptr + pos).*;
+        const cmd = @as(*align(1) const macho.load_command, @ptrCast(lc_buffer.ptr + pos)).*;
         ncmds += 1;
         pos += cmd.cmdsize;
     }
@@ -144,11 +144,11 @@ pub fn calcNumOfLCs(lc_buffer: []const u8) u32 {
 
 pub fn writeDylinkerLC(lc_writer: anytype) !void {
     const name_len = mem.sliceTo(default_dyld_path, 0).len;
-    const cmdsize = @intCast(u32, mem.alignForwardGeneric(
+    const cmdsize = @as(u32, @intCast(mem.alignForwardGeneric(
         u64,
         @sizeOf(macho.dylinker_command) + name_len,
         @sizeOf(u64),
-    ));
+    )));
     try lc_writer.writeStruct(macho.dylinker_command{
         .cmd = .LOAD_DYLINKER,
         .cmdsize = cmdsize,
@@ -171,11 +171,11 @@ const WriteDylibLCCtx = struct {
 
 fn writeDylibLC(ctx: WriteDylibLCCtx, lc_writer: anytype) !void {
     const name_len = ctx.name.len + 1;
-    const cmdsize = @intCast(u32, mem.alignForwardGeneric(
+    const cmdsize = @as(u32, @intCast(mem.alignForwardGeneric(
         u64,
         @sizeOf(macho.dylib_command) + name_len,
         @sizeOf(u64),
-    ));
+    )));
     try lc_writer.writeStruct(macho.dylib_command{
         .cmd = ctx.cmd,
         .cmdsize = cmdsize,
@@ -247,11 +247,11 @@ pub fn writeRpathLCs(gpa: Allocator, options: *const Options, lc_writer: anytype
 
     while (try it.next()) |rpath| {
         const rpath_len = rpath.len + 1;
-        const cmdsize = @intCast(u32, mem.alignForwardGeneric(
+        const cmdsize = @as(u32, @intCast(mem.alignForwardGeneric(
             u64,
             @sizeOf(macho.rpath_command) + rpath_len,
             @sizeOf(u64),
-        ));
+        )));
         try lc_writer.writeStruct(macho.rpath_command{
             .cmdsize = cmdsize,
             .path = @sizeOf(macho.rpath_command),

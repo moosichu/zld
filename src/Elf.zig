@@ -216,7 +216,7 @@ pub fn flush(self: *Elf) !void {
     try self.parseLibs(libs.keys());
 
     for (self.objects.items, 0..) |_, object_id| {
-        try self.resolveSymbolsInObject(@intCast(u16, object_id));
+        try self.resolveSymbolsInObject(@intCast(object_id));
     }
     try self.resolveSymbolsInArchives();
     try self.resolveSpecialSymbols();
@@ -237,7 +237,7 @@ pub fn flush(self: *Elf) !void {
     }
 
     for (self.objects.items, 0..) |*object, object_id| {
-        try object.splitIntoAtoms(self.base.allocator, @intCast(u16, object_id), self);
+        try object.splitIntoAtoms(self.base.allocator, @as(u16, @intCast(object_id)), self);
     }
 
     if (self.options.gc_sections) {
@@ -340,7 +340,7 @@ fn populateMetadata(self: *Elf) !void {
     if (self.phdr_seg_index == null) {
         const offset = @sizeOf(elf.Elf64_Ehdr);
         const size = @sizeOf(elf.Elf64_Phdr);
-        self.phdr_seg_index = @intCast(u16, self.phdrs.items.len);
+        self.phdr_seg_index = @as(u16, @intCast(self.phdrs.items.len));
         try self.phdrs.append(gpa, .{
             .p_type = elf.PT_PHDR,
             .p_flags = elf.PF_R,
@@ -353,7 +353,7 @@ fn populateMetadata(self: *Elf) !void {
         });
     }
     if (self.load_r_seg_index == null) {
-        self.load_r_seg_index = @intCast(u16, self.phdrs.items.len);
+        self.load_r_seg_index = @as(u16, @intCast(self.phdrs.items.len));
         try self.phdrs.append(gpa, .{
             .p_type = elf.PT_LOAD,
             .p_flags = elf.PF_R,
@@ -371,7 +371,7 @@ fn populateMetadata(self: *Elf) !void {
         }
     }
     if (self.load_re_seg_index == null) {
-        self.load_re_seg_index = @intCast(u16, self.phdrs.items.len);
+        self.load_re_seg_index = @as(u16, @intCast(self.phdrs.items.len));
         try self.phdrs.append(gpa, .{
             .p_type = elf.PT_LOAD,
             .p_flags = elf.PF_R | elf.PF_X,
@@ -389,7 +389,7 @@ fn populateMetadata(self: *Elf) !void {
         }
     }
     if (self.load_rw_seg_index == null) {
-        self.load_rw_seg_index = @intCast(u16, self.phdrs.items.len);
+        self.load_rw_seg_index = @as(u16, @intCast(self.phdrs.items.len));
         try self.phdrs.append(gpa, .{
             .p_type = elf.PT_LOAD,
             .p_flags = elf.PF_R | elf.PF_W,
@@ -519,8 +519,8 @@ fn insertSection(self: *Elf, shdr: elf.Elf64_Shdr, shdr_name: []const u8) !u16 {
     // self-hosted Zig compiler.
     const insertion_index = for (self.sections.items(.shdr), 0..) |oshdr, i| {
         const oshdr_name = self.shstrtab.getAssumeExists(oshdr.sh_name);
-        if (getSectionPrecedence(oshdr, oshdr_name) > precedence) break @intCast(u16, i);
-    } else @intCast(u16, self.sections.items(.shdr).len);
+        if (getSectionPrecedence(oshdr, oshdr_name) > precedence) break @as(u16, @intCast(i));
+    } else @as(u16, @intCast(self.sections.items(.shdr).len));
     log.debug("inserting section '{s}' at index {d}", .{
         shdr_name,
         insertion_index,
@@ -578,7 +578,7 @@ pub fn getOutputSection(self: *Elf, shdr: elf.Elf64_Shdr, shdr_name: []const u8)
                     if (flags & elf.SHF_WRITE != 0) {
                         if (flags & elf.SHF_TLS != 0) {
                             if (self.tls_seg_index == null) {
-                                self.tls_seg_index = @intCast(u16, self.phdrs.items.len);
+                                self.tls_seg_index = @as(u16, @intCast(self.phdrs.items.len));
                                 try self.phdrs.append(self.base.allocator, .{
                                     .p_type = elf.PT_TLS,
                                     .p_flags = elf.PF_R,
@@ -602,7 +602,7 @@ pub fn getOutputSection(self: *Elf, shdr: elf.Elf64_Shdr, shdr_name: []const u8)
                 elf.SHT_NOBITS => {
                     if (flags & elf.SHF_TLS != 0) {
                         if (self.tls_seg_index == null) {
-                            self.tls_seg_index = @intCast(u16, self.phdrs.items.len);
+                            self.tls_seg_index = @as(u16, @intCast(self.phdrs.items.len));
                             try self.phdrs.append(self.base.allocator, .{
                                 .p_type = elf.PT_TLS,
                                 .p_flags = elf.PF_R,
@@ -726,7 +726,7 @@ fn resolveSymbolsInObject(self: *Elf, object_id: u16) !void {
     log.debug("resolving symbols in {s}", .{object.name});
 
     for (object.symtab.items, 0..) |sym, i| {
-        const sym_id = @intCast(u32, i);
+        const sym_id = @as(u32, @intCast(i));
         const sym_name = self.getSymbolName(.{ .sym_index = sym_id, .file = object_id });
         const st_bind = sym.st_info >> 4;
         const st_type = sym.st_info & 0xf;
@@ -738,7 +738,7 @@ fn resolveSymbolsInObject(self: *Elf, object_id: u16) !void {
             },
             elf.STB_WEAK, elf.STB_GLOBAL => {
                 const name = try self.base.allocator.dupe(u8, sym_name);
-                const glob_ndx = @intCast(u32, self.globals.values().len);
+                const glob_ndx = @as(u32, @intCast(self.globals.values().len));
                 const res = try self.globals.getOrPut(self.base.allocator, name);
                 defer if (res.found_existing) self.base.allocator.free(name);
 
@@ -776,7 +776,7 @@ fn resolveSymbolsInObject(self: *Elf, object_id: u16) !void {
                         continue;
                     }
                 }
-                _ = self.unresolved.fetchSwapRemove(@intCast(u32, self.globals.getIndex(name).?));
+                _ = self.unresolved.fetchSwapRemove(@as(u32, @intCast(self.globals.getIndex(name).?)));
 
                 res.value_ptr.* = .{
                     .sym_index = sym_id,
@@ -809,7 +809,7 @@ fn resolveSymbolsInArchives(self: *Elf) !void {
             };
             assert(offsets.items.len > 0);
 
-            const object_id = @intCast(u16, self.objects.items.len);
+            const object_id = @as(u16, @intCast(self.objects.items.len));
             const object = try archive.parseObject(
                 self.base.allocator,
                 self.options.target.cpu_arch.?,
@@ -852,13 +852,13 @@ fn resolveSpecialSymbols(self: *Elf) !void {
                 .st_value = 0,
                 .st_size = 0,
             };
-            const sym_index = @intCast(u32, self.locals.items.len);
+            const sym_index = @as(u32, @intCast(self.locals.items.len));
             try self.locals.append(self.base.allocator, local);
             global.* = .{
                 .sym_index = sym_index,
                 .file = null,
             };
-            _ = self.unresolved.fetchSwapRemove(@intCast(u32, self.globals.getIndex(sym_name).?));
+            _ = self.unresolved.fetchSwapRemove(@as(u32, @intCast(self.globals.getIndex(sym_name).?)));
 
             continue :loop;
         }
@@ -902,7 +902,7 @@ pub fn createGotAtom(self: *Elf, target: SymbolWithLoc) !*Atom {
     try atom.code.appendSlice(self.base.allocator, code);
 
     const tsym_name = self.getSymbolName(target);
-    const r_sym = @intCast(u64, target.sym_index) << 32;
+    const r_sym = @as(u64, @intCast(target.sym_index)) << 32;
     const r_addend: i64 = target.file orelse -1;
     const r_info = r_sym | elf.R_X86_64_64;
     try atom.relocs.append(self.base.allocator, .{
@@ -913,7 +913,7 @@ pub fn createGotAtom(self: *Elf, target: SymbolWithLoc) !*Atom {
 
     const tmp_name = try std.fmt.allocPrint(self.base.allocator, ".got.{s}", .{tsym_name});
     defer self.base.allocator.free(tmp_name);
-    const sym_index = @intCast(u32, self.locals.items.len);
+    const sym_index = @as(u32, @intCast(self.locals.items.len));
     try self.locals.append(self.base.allocator, .{
         .st_name = try self.strtab.insert(self.base.allocator, tmp_name),
         .st_info = (elf.STB_LOCAL << 4) | elf.STT_OBJECT,
@@ -1117,7 +1117,7 @@ fn allocateAtoms(self: *Elf) !void {
     const slice = self.sections.slice();
     for (slice.items(.last_atom), 0..) |last_atom, i| {
         var atom = last_atom orelse continue;
-        const shdr_ndx = @intCast(u16, i);
+        const shdr_ndx = @as(u16, @intCast(i));
         const shdr = slice.items(.shdr)[shdr_ndx];
 
         // Find the first atom
@@ -1196,7 +1196,7 @@ fn logAtoms(self: *Elf) void {
     const slice = self.sections.slice();
     for (slice.items(.last_atom), 0..) |last_atom, i| {
         var atom = last_atom orelse continue;
-        const ndx = @intCast(u16, i);
+        const ndx = @as(u16, @intCast(i));
         const shdr = slice.items(.shdr)[ndx];
 
         log.debug(">>> {s}", .{self.shstrtab.getAssumeExists(shdr.sh_name)});
@@ -1218,7 +1218,7 @@ fn writeAtoms(self: *Elf) !void {
     const slice = self.sections.slice();
     for (slice.items(.last_atom), 0..) |last_atom, i| {
         var atom = last_atom orelse continue;
-        const shdr_ndx = @intCast(u16, i);
+        const shdr_ndx = @as(u16, @intCast(i));
         const shdr = slice.items(.shdr)[shdr_ndx];
 
         // TODO zero prefill .bss and .tbss if have presence in file
@@ -1263,7 +1263,7 @@ fn setEntryPoint(self: *Elf) !void {
 fn setStackSize(self: *Elf) !void {
     const stack_size = self.options.stack_size orelse return;
     const gnu_stack_phdr_index = self.gnu_stack_phdr_index orelse blk: {
-        const gnu_stack_phdr_index = @intCast(u16, self.phdrs.items.len);
+        const gnu_stack_phdr_index = @as(u16, @intCast(self.phdrs.items.len));
         try self.phdrs.append(self.base.allocator, .{
             .p_type = elf.PT_GNU_STACK,
             .p_flags = elf.PF_R | elf.PF_W,
@@ -1308,11 +1308,11 @@ fn writeSymtab(self: *Elf) !void {
             if (st_bind != elf.STB_LOCAL) continue;
             if (st_type == elf.STT_SECTION) continue;
             if (st_type == elf.STT_NOTYPE) continue;
-            if (sym.st_other == @enumToInt(elf.STV.INTERNAL)) continue;
-            if (sym.st_other == @enumToInt(elf.STV.HIDDEN)) continue;
+            if (sym.st_other == @intFromEnum(elf.STV.INTERNAL)) continue;
+            if (sym.st_other == @intFromEnum(elf.STV.HIDDEN)) continue;
             if (sym.st_other == STV_GC) continue;
 
-            const sym_name = object.getSymbolName(@intCast(u32, sym_id));
+            const sym_name = object.getSymbolName(@as(u32, @intCast(sym_id)));
             var out_sym = sym;
             out_sym.st_name = try self.strtab.insert(self.base.allocator, sym_name);
             try symtab.append(out_sym);
@@ -1322,14 +1322,14 @@ fn writeSymtab(self: *Elf) !void {
     for (self.locals.items) |sym| {
         const st_bind = sym.st_info >> 4;
         if (st_bind != elf.STB_LOCAL) continue;
-        if (sym.st_other == @enumToInt(elf.STV.INTERNAL)) continue;
-        if (sym.st_other == @enumToInt(elf.STV.HIDDEN)) continue;
+        if (sym.st_other == @intFromEnum(elf.STV.INTERNAL)) continue;
+        if (sym.st_other == @intFromEnum(elf.STV.HIDDEN)) continue;
         if (sym.st_other == STV_GC) continue;
         try symtab.append(sym);
     }
 
     // Denote start of globals
-    shdr.sh_info = @intCast(u32, symtab.items.len);
+    shdr.sh_info = @as(u32, @intCast(symtab.items.len));
     try symtab.ensureUnusedCapacity(self.globals.count());
     for (self.globals.values()) |global| {
         var sym = self.getSymbol(global);
@@ -1414,8 +1414,8 @@ fn writeShdrs(self: *Elf) !void {
 
 fn writeHeader(self: *Elf) !void {
     self.header.?.e_shstrndx = self.shstrtab_sect_index.?;
-    self.header.?.e_phnum = @intCast(u16, self.phdrs.items.len);
-    self.header.?.e_shnum = @intCast(u16, self.sections.items(.shdr).len);
+    self.header.?.e_phnum = @as(u16, @intCast(self.phdrs.items.len));
+    self.header.?.e_shnum = @as(u16, @intCast(self.sections.items(.shdr).len));
     log.debug("writing ELF header {} at 0x{x}", .{ self.header.?, 0 });
     try self.base.file.pwriteAll(mem.asBytes(&self.header.?), 0);
 }
@@ -1423,7 +1423,7 @@ fn writeHeader(self: *Elf) !void {
 pub fn getSectionByName(self: *Elf, name: []const u8) ?u16 {
     for (self.sections.items(.shdr), 0..) |shdr, i| {
         const this_name = self.shstrtab.getAssumeExists(shdr.sh_name);
-        if (mem.eql(u8, this_name, name)) return @intCast(u16, i);
+        if (mem.eql(u8, this_name, name)) return @as(u16, @intCast(i));
     } else return null;
 }
 
@@ -1496,7 +1496,7 @@ fn logSymtab(self: Elf) void {
             const st_bind = sym.st_info >> 4;
             // if (st_bind != elf.STB_LOCAL or st_type != elf.STT_SECTION) continue;
             if (st_bind != elf.STB_LOCAL) continue;
-            log.debug("  {d}: {s}: {}", .{ i, object.getSymbolName(@intCast(u32, i)), sym });
+            log.debug("  {d}: {s}: {}", .{ i, object.getSymbolName(@as(u32, @intCast(i))), sym });
         }
     }
 

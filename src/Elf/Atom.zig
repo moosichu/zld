@@ -126,7 +126,7 @@ pub fn getTargetAtom(self: Atom, elf_file: *Elf, rel: elf.Elf64_Rela) ?*Atom {
         // Special handling as we have repurposed r_addend for out GOT atoms.
         // Now, r_addend in those cases contains the index to the object file where
         // the target symbol is defined.
-        const file: ?u32 = if (rel.r_addend > -1) @intCast(u32, rel.r_addend) else null;
+        const file: ?u32 = if (rel.r_addend > -1) @as(u32, @intCast(rel.r_addend)) else null;
         return elf_file.getAtomForSymbol(.{
             .sym_index = r_sym,
             .file = file,
@@ -207,7 +207,7 @@ pub fn resolveRelocs(self: *Atom, elf_file: *Elf) !void {
             // Special handling as we have repurposed r_addend for out GOT atoms.
             // Now, r_addend in those cases contains the index to the object file where
             // the target symbol is defined.
-            const file: ?u32 = if (rel.r_addend > -1) @intCast(u32, rel.r_addend) else null;
+            const file: ?u32 = if (rel.r_addend > -1) @as(u32, @intCast(rel.r_addend)) else null;
             const tsym = elf_file.getSymbol(.{
                 .sym_index = r_sym,
                 .file = file,
@@ -235,14 +235,14 @@ pub fn resolveRelocs(self: *Atom, elf_file: *Elf) !void {
         switch (r_type) {
             elf.R_X86_64_NONE => {},
             elf.R_X86_64_64 => {
-                const target = @intCast(i64, self.getTargetAddress(r_sym, elf_file)) + rel.r_addend;
+                const target = @as(i64, @intCast(self.getTargetAddress(r_sym, elf_file))) + rel.r_addend;
                 log.debug("R_X86_64_64: {x}: [() => 0x{x}] ({s})", .{ rel.r_offset, target, tsym_name });
                 mem.writeIntLittle(i64, self.code.items[rel.r_offset..][0..8], target);
             },
             elf.R_X86_64_PC32 => {
-                const source = @intCast(i64, sym.st_value + rel.r_offset);
-                const target = @intCast(i64, self.getTargetAddress(r_sym, elf_file));
-                const displacement = @intCast(i32, target - source + rel.r_addend);
+                const source = @as(i64, @intCast(sym.st_value + rel.r_offset));
+                const target = @as(i64, @intCast(self.getTargetAddress(r_sym, elf_file)));
+                const displacement = @as(i32, @intCast(target - source + rel.r_addend));
                 log.debug("R_X86_64_PC32: {x}: [0x{x} => 0x{x}] ({s})", .{
                     rel.r_offset,
                     source,
@@ -252,9 +252,9 @@ pub fn resolveRelocs(self: *Atom, elf_file: *Elf) !void {
                 mem.writeIntLittle(i32, self.code.items[rel.r_offset..][0..4], displacement);
             },
             elf.R_X86_64_PLT32 => {
-                const source = @intCast(i64, sym.st_value + rel.r_offset);
-                const target = @intCast(i64, self.getTargetAddress(r_sym, elf_file));
-                const displacement = @intCast(i32, target - source + rel.r_addend);
+                const source = @as(i64, @intCast(sym.st_value + rel.r_offset));
+                const target = @as(i64, @intCast(self.getTargetAddress(r_sym, elf_file)));
+                const displacement = @as(i32, @intCast(target - source + rel.r_addend));
                 log.debug("R_X86_64_PLT32: {x}: [0x{x} => 0x{x}] ({s})", .{
                     rel.r_offset,
                     source,
@@ -265,9 +265,9 @@ pub fn resolveRelocs(self: *Atom, elf_file: *Elf) !void {
             },
             elf.R_X86_64_32 => {
                 const target = self.getTargetAddress(r_sym, elf_file);
-                const scaled = math.cast(u32, @intCast(i64, target) + rel.r_addend) orelse {
+                const scaled = math.cast(u32, @as(i64, @intCast(target)) + rel.r_addend) orelse {
                     log.err("R_X86_64_32: target value overflows 32bits", .{});
-                    log.err("  target value 0x{x}", .{@intCast(i64, target) + rel.r_addend});
+                    log.err("  target value 0x{x}", .{@as(i64, @intCast(target)) + rel.r_addend});
                     log.err("  target symbol {s}", .{tsym_name});
                     return error.RelocationOverflow;
                 };
@@ -276,9 +276,9 @@ pub fn resolveRelocs(self: *Atom, elf_file: *Elf) !void {
             },
             elf.R_X86_64_32S => {
                 const target = self.getTargetAddress(r_sym, elf_file);
-                const scaled = math.cast(i32, @intCast(i64, target) + rel.r_addend) orelse {
+                const scaled = math.cast(i32, @as(i64, @intCast(target)) + rel.r_addend) orelse {
                     log.err("R_X86_64_32: target value overflows 32bits", .{});
-                    log.err("  target value 0x{x}", .{@intCast(i64, target) + rel.r_addend});
+                    log.err("  target value 0x{x}", .{@as(i64, @intCast(target)) + rel.r_addend});
                     log.err("  target symbol {s}", .{tsym_name});
                     return error.RelocationOverflow;
                 };
@@ -286,7 +286,7 @@ pub fn resolveRelocs(self: *Atom, elf_file: *Elf) !void {
                 mem.writeIntLittle(i32, self.code.items[rel.r_offset..][0..4], scaled);
             },
             elf.R_X86_64_REX_GOTPCRELX, elf.R_X86_64_GOTPCREL => outer: {
-                const source = @intCast(i64, sym.st_value + rel.r_offset);
+                const source = @as(i64, @intCast(sym.st_value + rel.r_offset));
                 const global = elf_file.globals.get(tsym_name).?;
                 const got_atom = elf_file.got_entries_map.get(global) orelse {
                     log.debug("TODO R_X86_64_REX_GOTPCRELX unhandled: no GOT entry found", .{});
@@ -302,10 +302,10 @@ pub fn resolveRelocs(self: *Atom, elf_file: *Elf) !void {
                     if (got_atom.file) |file| {
                         const actual_object = elf_file.objects.items[file];
                         const actual_tsym = actual_object.symtab.items[got_atom.sym_index];
-                        break :blk @intCast(i64, actual_tsym.st_value);
+                        break :blk @as(i64, @intCast(actual_tsym.st_value));
                     }
                     const actual_tsym = elf_file.locals.items[got_atom.sym_index];
-                    break :blk @intCast(i64, actual_tsym.st_value);
+                    break :blk @as(i64, @intCast(actual_tsym.st_value));
                 };
                 log.debug("R_X86_64_REX_GOTPCRELX: {x}: [0x{x} => 0x{x}] ({s})", .{
                     rel.r_offset,
@@ -313,7 +313,7 @@ pub fn resolveRelocs(self: *Atom, elf_file: *Elf) !void {
                     target,
                     tsym_name,
                 });
-                const displacement = @intCast(i32, target - source + rel.r_addend);
+                const displacement = @as(i32, @intCast(target - source + rel.r_addend));
                 mem.writeIntLittle(i32, self.code.items[rel.r_offset..][0..4], displacement);
             },
             elf.R_X86_64_TPOFF32 => {
@@ -328,7 +328,7 @@ pub fn resolveRelocs(self: *Atom, elf_file: *Elf) !void {
                     const shdr = elf_file.sections.items(.shdr)[index];
                     break :base_addr shdr.sh_addr + shdr.sh_size;
                 };
-                const tls_offset = @truncate(u32, @bitCast(u64, -@intCast(i64, base_addr - target) + rel.r_addend));
+                const tls_offset = @as(u32, @truncate(@as(u64, @bitCast(-@as(i64, @intCast(base_addr - target)) + rel.r_addend))));
                 log.debug("R_X86_64_TPOFF32: {x}: [0x{x} => 0x{x} (TLS)] ({s})", .{
                     rel.r_offset,
                     source,

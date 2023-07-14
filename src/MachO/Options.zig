@@ -323,7 +323,7 @@ pub fn parseArgs(arena: Allocator, ctx: Zld.MainCtx) !Options {
 
             // First, try parsing platform as a numeric value.
             if (std.fmt.parseUnsigned(u32, platform, 10)) |ord| {
-                switch (@intToEnum(macho.PLATFORM, ord)) {
+                switch (@as(macho.PLATFORM, @enumFromInt(ord))) {
                     .MACOS => tmp_target = .{
                         .os_tag = .macos,
                         .abi = .none,

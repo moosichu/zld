@@ -132,7 +132,7 @@ pub fn parse(self: *Archive, allocator: Allocator, reader: anytype) !void {
         i = 0;
         var pos: usize = try inner_stream.getPos();
         while (i < nsyms) : (i += 1) {
-            const sym_name = mem.sliceTo(@ptrCast([*:0]const u8, buffer.ptr + pos), 0);
+            const sym_name = mem.sliceTo(@as([*:0]const u8, @ptrCast(buffer.ptr + pos)), 0);
             const owned_name = try allocator.dupe(u8, sym_name);
             const res = try self.toc.getOrPut(allocator, owned_name);
             defer if (res.found_existing) allocator.free(owned_name);
@@ -168,7 +168,7 @@ pub fn parse(self: *Archive, allocator: Allocator, reader: anytype) !void {
 
 fn getExtName(self: Archive, off: u32) []const u8 {
     assert(off < self.extnames_strtab.items.len);
-    return mem.sliceTo(@ptrCast([*:'\n']const u8, self.extnames_strtab.items.ptr + off), 0);
+    return mem.sliceTo(@as([*:'\n']const u8, @ptrCast(self.extnames_strtab.items.ptr + off)), 0);
 }
 
 pub fn parseObject(self: Archive, allocator: Allocator, cpu_arch: std.Target.Cpu.Arch, offset: u32) !Object {

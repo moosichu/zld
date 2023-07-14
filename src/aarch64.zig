@@ -24,16 +24,16 @@ pub const Register = enum(u7) {
     sp, wsp,
 
     pub fn id(self: Register) u6 {
-        return switch (@enumToInt(self)) {
-            0...63 => return @as(u6, @truncate(u5, @enumToInt(self))),
+        return switch (@intFromEnum(self)) {
+            0...63 => return @as(u6, @as(u5, @truncate(@intFromEnum(self)))),
             64...65 => 32,
             else => unreachable,
         };
     }
 
     pub fn enc(self: Register) u5 {
-        return switch (@enumToInt(self)) {
-            0...63 => return @truncate(u5, @enumToInt(self)),
+        return switch (@intFromEnum(self)) {
+            0...63 => return @as(u5, @truncate( @intFromEnum(self))),
             64...65 => 31,
             else => unreachable,
         };
@@ -41,7 +41,7 @@ pub const Register = enum(u7) {
 
     /// Returns the bit-width of the register.
     pub fn size(self: Register) u7 {
-        return switch (@enumToInt(self)) {
+        return switch (@intFromEnum(self)) {
             0...31 => 64,
             32...63 => 32,
             64 => 64,
@@ -52,9 +52,9 @@ pub const Register = enum(u7) {
 
     /// Convert from any register to its 64 bit alias.
     pub fn to64(self: Register) Register {
-        return switch (@enumToInt(self)) {
+        return switch (@intFromEnum(self)) {
             0...31 => self,
-            32...63 => @intToEnum(Register, @enumToInt(self) - 32),
+            32...63 => @enumFromInt(@intFromEnum(self) - 32),
             64 => .sp,
             65 => .sp,
             else => unreachable,
@@ -63,8 +63,8 @@ pub const Register = enum(u7) {
 
     /// Convert from any register to its 32 bit alias.
     pub fn to32(self: Register) Register {
-        return switch (@enumToInt(self)) {
-            0...31 => @intToEnum(Register, @enumToInt(self) + 32),
+        return switch (@intFromEnum(self)) {
+            0...31 => @enumFromInt(@intFromEnum(self) + 32),
             32...63 => self,
             64 => .wsp,
             65 => .wsp,
@@ -138,12 +138,12 @@ pub const FloatingPointRegister = enum(u8) {
     b24, b25, b26, b27, b28, b29, b30, b31,
 
     pub fn id(self: FloatingPointRegister) u5 {
-        return @truncate(u5, @enumToInt(self));
+        return @truncate(@intFromEnum(self));
     }
 
     /// Returns the bit-width of the register.
     pub fn size(self: FloatingPointRegister) u8 {
-        return switch (@enumToInt(self)) {
+        return switch (@intFromEnum(self)) {
             0...31 => 128,
             32...63 => 64,
             64...95 => 32,
@@ -155,27 +155,27 @@ pub const FloatingPointRegister = enum(u8) {
 
     /// Convert from any register to its 128 bit alias.
     pub fn to128(self: FloatingPointRegister) FloatingPointRegister {
-        return @intToEnum(FloatingPointRegister, self.id());
+        return @enumFromInt(self.id());
     }
 
     /// Convert from any register to its 64 bit alias.
     pub fn to64(self: FloatingPointRegister) FloatingPointRegister {
-        return @intToEnum(FloatingPointRegister, @as(u8, self.id()) + 32);
+        return @enumFromInt(@as(u8, self.id()) + 32);
     }
 
     /// Convert from any register to its 32 bit alias.
     pub fn to32(self: FloatingPointRegister) FloatingPointRegister {
-        return @intToEnum(FloatingPointRegister, @as(u8, self.id()) + 64);
+        return @enumFromInt(@as(u8, self.id()) + 64);
     }
 
     /// Convert from any register to its 16 bit alias.
     pub fn to16(self: FloatingPointRegister) FloatingPointRegister {
-        return @intToEnum(FloatingPointRegister, @as(u8, self.id()) + 96);
+        return @enumFromInt(@as(u8, self.id()) + 96);
     }
 
     /// Convert from any register to its 8 bit alias.
     pub fn to8(self: FloatingPointRegister) FloatingPointRegister {
-        return @intToEnum(FloatingPointRegister, @as(u8, self.id()) + 128);
+        return @enumFromInt(@as(u8, self.id()) + 128);
     }
 };
 
@@ -492,27 +492,27 @@ pub const Instruction = union(enum) {
 
     pub fn toU32(self: Instruction) u32 {
         return switch (self) {
-            .move_wide_immediate => |v| @bitCast(u32, v),
-            .pc_relative_address => |v| @bitCast(u32, v),
-            .load_store_register => |v| @bitCast(u32, v),
-            .load_store_register_pair => |v| @bitCast(u32, v),
-            .load_literal => |v| @bitCast(u32, v),
-            .exception_generation => |v| @bitCast(u32, v),
-            .unconditional_branch_register => |v| @bitCast(u32, v),
-            .unconditional_branch_immediate => |v| @bitCast(u32, v),
-            .no_operation => |v| @bitCast(u32, v),
-            .logical_shifted_register => |v| @bitCast(u32, v),
-            .add_subtract_immediate => |v| @bitCast(u32, v),
-            .logical_immediate => |v| @bitCast(u32, v),
-            .bitfield => |v| @bitCast(u32, v),
-            .add_subtract_shifted_register => |v| @bitCast(u32, v),
-            .add_subtract_extended_register => |v| @bitCast(u32, v),
+            .move_wide_immediate => |v| @bitCast(v),
+            .pc_relative_address => |v| @bitCast(v),
+            .load_store_register => |v| @bitCast(v),
+            .load_store_register_pair => |v| @bitCast(v),
+            .load_literal => |v| @bitCast(v),
+            .exception_generation => |v| @bitCast(v),
+            .unconditional_branch_register => |v| @bitCast(v),
+            .unconditional_branch_immediate => |v| @bitCast(v),
+            .no_operation => |v| @bitCast(v),
+            .logical_shifted_register => |v| @bitCast(v),
+            .add_subtract_immediate => |v| @bitCast(v),
+            .logical_immediate => |v| @bitCast(v),
+            .bitfield => |v| @bitCast(v),
+            .add_subtract_shifted_register => |v| @bitCast(v),
+            .add_subtract_extended_register => |v| @bitCast(v),
             // TODO once packed structs work, this can be refactored
             .conditional_branch => |v| @as(u32, v.cond) | (@as(u32, v.o0) << 4) | (@as(u32, v.imm19) << 5) | (@as(u32, v.o1) << 24) | (@as(u32, v.fixed) << 25),
             .compare_and_branch => |v| @as(u32, v.rt) | (@as(u32, v.imm19) << 5) | (@as(u32, v.op) << 24) | (@as(u32, v.fixed) << 25) | (@as(u32, v.sf) << 31),
             .conditional_select => |v| @as(u32, v.rd) | @as(u32, v.rn) << 5 | @as(u32, v.op2) << 10 | @as(u32, v.cond) << 12 | @as(u32, v.rm) << 16 | @as(u32, v.fixed) << 21 | @as(u32, v.s) << 29 | @as(u32, v.op) << 30 | @as(u32, v.sf) << 31,
-            .data_processing_3_source => |v| @bitCast(u32, v),
-            .data_processing_2_source => |v| @bitCast(u32, v),
+            .data_processing_3_source => |v| @bitCast(v),
+            .data_processing_2_source => |v| @bitCast(v),
         };
     }
 
@@ -530,7 +530,7 @@ pub const Instruction = union(enum) {
             .move_wide_immediate = .{
                 .rd = rd.enc(),
                 .imm16 = imm16,
-                .hw = @intCast(u2, shift / 16),
+                .hw = @intCast(shift / 16),
                 .opc = opc,
                 .sf = switch (rd.size()) {
                     32 => 0,
@@ -543,12 +543,12 @@ pub const Instruction = union(enum) {
 
     fn pcRelativeAddress(rd: Register, imm21: i21, op: u1) Instruction {
         assert(rd.size() == 64);
-        const imm21_u = @bitCast(u21, imm21);
+        const imm21_u :u32= @bitCast( imm21);
         return Instruction{
             .pc_relative_address = .{
                 .rd = rd.enc(),
-                .immlo = @truncate(u2, imm21_u),
-                .immhi = @truncate(u19, imm21_u >> 2),
+                .immlo = @truncate(imm21_u),
+                .immhi = @truncate(imm21_u >> 2),
                 .op = op,
             },
         };
@@ -584,15 +584,15 @@ pub const Instruction = union(enum) {
         pub fn toU12(self: LoadStoreOffset) u12 {
             return switch (self) {
                 .immediate => |imm_type| switch (imm_type) {
-                    .post_index => |v| (@intCast(u12, @bitCast(u9, v)) << 2) + 1,
-                    .pre_index => |v| (@intCast(u12, @bitCast(u9, v)) << 2) + 3,
+                    .post_index => |v| (@as(u12,@intCast(@as(u9, @bitCast(v)))) << 2) + 1,
+                    .pre_index => |v| (@as(u12,@intCast(@as(u9, @bitCast(v)))) << 2) + 3,
                     .unsigned => |v| v,
                 },
                 .register => |r| switch (r.shift) {
-                    .uxtw => |v| (@intCast(u12, r.rm) << 6) + (@intCast(u12, v) << 2) + 16 + 2050,
-                    .lsl => |v| (@intCast(u12, r.rm) << 6) + (@intCast(u12, v) << 2) + 24 + 2050,
-                    .sxtw => |v| (@intCast(u12, r.rm) << 6) + (@intCast(u12, v) << 2) + 48 + 2050,
-                    .sxtx => |v| (@intCast(u12, r.rm) << 6) + (@intCast(u12, v) << 2) + 56 + 2050,
+                    .uxtw => |v| (@as(u12, @intCast(r.rm)) << 6) + (@as(u12,@intCast(v)) << 2) + 16 + 2050,
+                    .lsl => |v| (@as(u12, @intCast(r.rm)) << 6) + (@as(u12,@intCast(v)) << 2) + 24 + 2050,
+                    .sxtw => |v| (@as(u12, @intCast(r.rm)) << 6) + (@as(u12,@intCast(v)) << 2) + 48 + 2050,
+                    .sxtx => |v| (@as(u12, @intCast(r.rm)) << 6) + (@as(u12,@intCast(v)) << 2) + 56 + 2050,
                 },
             };
         }
@@ -774,14 +774,14 @@ pub const Instruction = union(enum) {
         switch (rt1.size()) {
             32 => {
                 assert(-256 <= offset and offset <= 252);
-                const imm7 = @truncate(u7, @bitCast(u9, offset >> 2));
+                const imm7 :u7 = @truncate(@as(u9, @bitCast(offset >> 2)));
                 return Instruction{
                     .load_store_register_pair = .{
                         .rt1 = rt1.enc(),
                         .rn = rn.enc(),
                         .rt2 = rt2.enc(),
                         .imm7 = imm7,
-                        .load = @boolToInt(load),
+                        .load = @intFromBool(load),
                         .encoding = encoding,
                         .opc = 0b00,
                     },
@@ -789,14 +789,14 @@ pub const Instruction = union(enum) {
             },
             64 => {
                 assert(-512 <= offset and offset <= 504);
-                const imm7 = @truncate(u7, @bitCast(u9, offset >> 3));
+                const imm7 : u7 = @truncate(@as( u9, @bitCast(offset >> 3)));
                 return Instruction{
                     .load_store_register_pair = .{
                         .rt1 = rt1.enc(),
                         .rn = rn.enc(),
                         .rt2 = rt2.enc(),
                         .imm7 = imm7,
-                        .load = @boolToInt(load),
+                        .load = @intFromBool(load),
                         .encoding = encoding,
                         .opc = 0b10,
                     },
@@ -862,7 +862,7 @@ pub const Instruction = union(enum) {
     ) Instruction {
         return Instruction{
             .unconditional_branch_immediate = .{
-                .imm26 = @bitCast(u26, @intCast(i26, offset >> 2)),
+                .imm26 = @bitCast(@as(i26, @intCast(offset >> 2))),
                 .op = op,
             },
         };
@@ -890,7 +890,7 @@ pub const Instruction = union(enum) {
                 .imm6 = amount,
                 .rm = rm.enc(),
                 .n = n,
-                .shift = @enumToInt(shift),
+                .shift = @intFromEnum(shift),
                 .opc = opc,
                 .sf = switch (rd.size()) {
                     32 => 0b0,
@@ -917,7 +917,7 @@ pub const Instruction = union(enum) {
                 .rd = rd.enc(),
                 .rn = rn.enc(),
                 .imm12 = imm12,
-                .sh = @boolToInt(shift),
+                .sh = @intFromBool(shift),
                 .s = s,
                 .op = op,
                 .sf = switch (rd.size()) {
@@ -1006,7 +1006,7 @@ pub const Instruction = union(enum) {
                 .rn = rn.enc(),
                 .imm6 = imm6,
                 .rm = rm.enc(),
-                .shift = @enumToInt(shift),
+                .shift = @intFromEnum(shift),
                 .s = s,
                 .op = op,
                 .sf = switch (rd.size()) {
@@ -1043,7 +1043,7 @@ pub const Instruction = union(enum) {
                 .rd = rd.enc(),
                 .rn = rn.enc(),
                 .imm3 = imm3,
-                .option = @enumToInt(extend),
+                .option = @intFromEnum(extend),
                 .rm = rm.enc(),
                 .s = s,
                 .op = op,
@@ -1066,9 +1066,9 @@ pub const Instruction = union(enum) {
 
         return Instruction{
             .conditional_branch = .{
-                .cond = @enumToInt(cond),
+                .cond = @intFromEnum(cond),
                 .o0 = o0,
-                .imm19 = @bitCast(u19, @intCast(i19, offset >> 2)),
+                .imm19 = @bitCast(@as(i19, @intCast(offset >> 2))),
                 .o1 = o1,
             },
         };
@@ -1084,7 +1084,7 @@ pub const Instruction = union(enum) {
         return Instruction{
             .compare_and_branch = .{
                 .rt = rt.enc(),
-                .imm19 = @bitCast(u19, @intCast(i19, offset >> 2)),
+                .imm19 = @bitCast(@as( i19, @intCast(offset >> 2))),
                 .op = op,
                 .sf = switch (rt.size()) {
                     32 => 0b0,
@@ -1112,7 +1112,7 @@ pub const Instruction = union(enum) {
                 .rd = rd.enc(),
                 .rn = rn.enc(),
                 .op2 = op2,
-                .cond = @enumToInt(cond),
+                .cond = @intFromEnum(cond),
                 .rm = rm.enc(),
                 .s = s,
                 .op = op,
@@ -1274,7 +1274,7 @@ pub const Instruction = union(enum) {
     };
 
     pub fn ldp(rt1: Register, rt2: Register, rn: Register, offset: LoadStorePairOffset) Instruction {
-        return loadStoreRegisterPair(rt1, rt2, rn, offset.offset, @enumToInt(offset.encoding), true);
+        return loadStoreRegisterPair(rt1, rt2, rn, offset.offset, @intFromEnum(offset.encoding), true);
     }
 
     pub fn ldnp(rt1: Register, rt2: Register, rn: Register, offset: i9) Instruction {
@@ -1282,7 +1282,7 @@ pub const Instruction = union(enum) {
     }
 
     pub fn stp(rt1: Register, rt2: Register, rn: Register, offset: LoadStorePairOffset) Instruction {
-        return loadStoreRegisterPair(rt1, rt2, rn, offset.offset, @enumToInt(offset.encoding), false);
+        return loadStoreRegisterPair(rt1, rt2, rn, offset.offset, @intFromEnum(offset.encoding), false);
     }
 
     pub fn stnp(rt1: Register, rt2: Register, rn: Register, offset: i9) Instruction {
@@ -1489,12 +1489,12 @@ pub const Instruction = union(enum) {
     }
 
     pub fn asrImmediate(rd: Register, rn: Register, shift: u6) Instruction {
-        const imms = @intCast(u6, rd.size() - 1);
+        const imms :u6 = @intCast(rd.size() - 1);
         return sbfm(rd, rn, shift, imms);
     }
 
     pub fn sbfx(rd: Register, rn: Register, lsb: u6, width: u7) Instruction {
-        return sbfm(rd, rn, lsb, @intCast(u6, lsb + width - 1));
+        return sbfm(rd, rn, lsb, @intCast(lsb + width - 1));
     }
 
     pub fn sxtb(rd: Register, rn: Register) Instruction {
@@ -1511,17 +1511,17 @@ pub const Instruction = union(enum) {
     }
 
     pub fn lslImmediate(rd: Register, rn: Register, shift: u6) Instruction {
-        const size = @intCast(u6, rd.size() - 1);
+        const size :u6 = @intCast(rd.size() - 1);
         return ubfm(rd, rn, size - shift + 1, size - shift);
     }
 
     pub fn lsrImmediate(rd: Register, rn: Register, shift: u6) Instruction {
-        const imms = @intCast(u6, rd.size() - 1);
+        const imms :u6 = @intCast(rd.size() - 1);
         return ubfm(rd, rn, shift, imms);
     }
 
     pub fn ubfx(rd: Register, rn: Register, lsb: u6, width: u7) Instruction {
-        return ubfm(rd, rn, lsb, @intCast(u6, lsb + width - 1));
+        return ubfm(rd, rn, lsb, @intCast(lsb + width - 1));
     }
 
     pub fn uxtb(rd: Register, rn: Register) Instruction {

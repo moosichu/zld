@@ -92,11 +92,11 @@ pub fn parse(self: *Object, allocator: Allocator, cpu_arch: std.Target.Cpu.Arch)
 
     for (self.getShdrs(), 0..) |shdr, i| switch (shdr.sh_type) {
         elf.SHT_SYMTAB => {
-            self.symtab_index = @intCast(u16, i);
+            self.symtab_index = @intCast(i);
             const nsyms = @divExact(shdr.sh_size, @sizeOf(elf.Elf64_Sym));
-            try self.symtab.appendSlice(allocator, @ptrCast(
+            try self.symtab.appendSlice(allocator, @as(
                 [*]const elf.Elf64_Sym,
-                @alignCast(@alignOf(elf.Elf64_Sym), &self.data[shdr.sh_offset]),
+                @ptrCast(@alignCast(&self.data[shdr.sh_offset])),
             )[0..nsyms]);
         },
         else => {},
@@ -146,14 +146,14 @@ pub fn splitIntoAtoms(self: *Object, allocator: Allocator, object_id: u16, elf_f
 
     for (shdrs, 0..) |shdr, i| switch (shdr.sh_type) {
         elf.SHT_REL, elf.SHT_RELA => {
-            try rel_shdrs.putNoClobber(@intCast(u16, shdr.sh_info), @intCast(u16, i));
+            try rel_shdrs.putNoClobber(@as(u16, @intCast(shdr.sh_info)), @as(u16, @intCast(i)));
         },
         else => {},
     };
 
     for (shdrs, 0..) |shdr, i| switch (shdr.sh_type) {
         elf.SHT_PROGBITS, elf.SHT_NOBITS => {
-            try symbols_by_shndx.putNoClobber(@intCast(u16, i), std.ArrayList(u32).init(allocator));
+            try symbols_by_shndx.putNoClobber(@as(u16, @intCast(i)), std.ArrayList(u32).init(allocator));
         },
         else => {},
     };
@@ -162,12 +162,12 @@ pub fn splitIntoAtoms(self: *Object, allocator: Allocator, object_id: u16, elf_f
         if (sym.st_shndx == elf.SHN_UNDEF) continue;
         if (elf.SHN_LORESERVE <= sym.st_shndx and sym.st_shndx < elf.SHN_HIRESERVE) continue;
         const map = symbols_by_shndx.getPtr(sym.st_shndx) orelse continue;
-        try map.append(@intCast(u32, sym_id));
+        try map.append(@as(u32, @intCast(sym_id)));
     }
 
     for (shdrs, 0..) |shdr, i| switch (shdr.sh_type) {
         elf.SHT_PROGBITS, elf.SHT_NOBITS => {
-            const ndx = @intCast(u16, i);
+            const ndx = @as(u16, @intCast(i));
             const shdr_name = self.getShString(shdr.sh_name);
 
             log.debug("  parsing section '{s}'", .{shdr_name});
@@ -187,8 +187,8 @@ pub fn splitIntoAtoms(self: *Object, allocator: Allocator, object_id: u16, elf_f
             try self.managed_atoms.append(allocator, atom);
 
             atom.file = object_id;
-            atom.size = @intCast(u32, shdr.sh_size);
-            atom.alignment = @intCast(u32, shdr.sh_addralign);
+            atom.size = @as(u32, @intCast(shdr.sh_size));
+            atom.alignment = @as(u32, @intCast(shdr.sh_addralign));
 
             // TODO if --gc-sections and there is exactly one contained symbol,
             // we can prune the main one. For example, in this situation we
@@ -226,7 +226,7 @@ pub fn splitIntoAtoms(self: *Object, allocator: Allocator, object_id: u16, elf_f
             }
 
             atom.sym_index = sym_index orelse blk: {
-                const index = @intCast(u32, self.symtab.items.len);
+                const index = @as(u32, @intCast(self.symtab.items.len));
                 try self.symtab.append(allocator, .{
                     .st_name = 0,
                     .st_info = (elf.STB_LOCAL << 4) | elf.STT_OBJECT,
@@ -258,7 +258,7 @@ pub fn splitIntoAtoms(self: *Object, allocator: Allocator, object_id: u16, elf_f
                     const bytes = raw_relocs[count * rel_shdr.sh_entsize ..][0..rel_shdr.sh_entsize];
                     var rel = blk: {
                         if (rel_shdr.sh_type == elf.SHT_REL) {
-                            const rel = @ptrCast(*const elf.Elf64_Rel, @alignCast(@alignOf(elf.Elf64_Rel), bytes)).*;
+                            const rel = @as(*const elf.Elf64_Rel, @ptrCast(@alignCast(bytes))).*;
                             // TODO parse addend from the placeholder
                             // const addend = mem.readIntLittle(i32, code[rel.r_offset..][0..4]);
                             // break :blk .{
@@ -271,7 +271,7 @@ pub fn splitIntoAtoms(self: *Object, allocator: Allocator, object_id: u16, elf_f
                             return error.TODOParseAddendFromPlaceholder;
                         }
 
-                        break :blk @ptrCast(*const elf.Elf64_Rela, @alignCast(@alignOf(elf.Elf64_Rela), bytes)).*;
+                        break :blk @as(*const elf.Elf64_Rela, @ptrCast(@alignCast(bytes))).*;
                     };
 
                     // While traversing relocations, synthesize any missing atom.
@@ -308,7 +308,7 @@ pub fn splitIntoAtoms(self: *Object, allocator: Allocator, object_id: u16, elf_f
                                         try new_inst.encode(writer);
 
                                         const r_sym = rel.r_sym();
-                                        rel.r_info = (@intCast(u64, r_sym) << 32) | elf.R_X86_64_PC32;
+                                        rel.r_info = (@as(u64, @intCast(r_sym)) << 32) | elf.R_X86_64_PC32;
                                         log.debug("rewriting R_X86_64_REX_GOTPCRELX -> R_X86_64_PC32: MOV -> LEA", .{});
                                         break :blk;
                                     },
@@ -322,7 +322,7 @@ pub fn splitIntoAtoms(self: *Object, allocator: Allocator, object_id: u16, elf_f
                                         try new_inst.encode(writer);
 
                                         const r_sym = rel.r_sym();
-                                        rel.r_info = (@intCast(u64, r_sym) << 32) | elf.R_X86_64_32;
+                                        rel.r_info = (@as(u64, @intCast(r_sym)) << 32) | elf.R_X86_64_32;
                                         rel.r_addend = 0;
                                         log.debug("rewriting R_X86_64_REX_GOTPCRELX -> R_X86_64_32: CMP r64, r/m64 -> CMP r/m64, imm32", .{});
 
@@ -376,7 +376,7 @@ pub fn splitIntoAtoms(self: *Object, allocator: Allocator, object_id: u16, elf_f
                                         try new_inst.encode(writer);
 
                                         const r_sym = rel.r_sym();
-                                        rel.r_info = (@intCast(u64, r_sym) << 32) | elf.R_X86_64_TPOFF32;
+                                        rel.r_info = (@as(u64, @intCast(r_sym)) << 32) | elf.R_X86_64_TPOFF32;
                                         rel.r_addend = 0;
                                         log.debug("rewriting R_X86_64_GOTTPOFF -> R_X86_64_TPOFF32: MOV r64, r/m64 -> MOV r/m64, imm32", .{});
                                     },
@@ -389,7 +389,7 @@ pub fn splitIntoAtoms(self: *Object, allocator: Allocator, object_id: u16, elf_f
                             if (isDefinitionAvailable(elf_file, global)) {
                                 // rewrite into TPOFF32
                                 const r_sym = rel.r_sym();
-                                rel.r_info = (@intCast(u64, r_sym) << 32) | elf.R_X86_64_TPOFF32;
+                                rel.r_info = (@as(u64, @intCast(r_sym)) << 32) | elf.R_X86_64_TPOFF32;
                                 rel.r_addend = 0;
                                 log.debug("rewriting R_X86_64_DTPOFF64 -> R_X86_64_TPOFF32", .{});
                             }
@@ -409,9 +409,9 @@ pub fn splitIntoAtoms(self: *Object, allocator: Allocator, object_id: u16, elf_f
 }
 
 pub inline fn getShdrs(self: Object) []const elf.Elf64_Shdr {
-    return @ptrCast(
+    return @as(
         [*]const elf.Elf64_Shdr,
-        @alignCast(@alignOf(elf.Elf64_Shdr), &self.data[self.header.e_shoff]),
+        @ptrCast(@alignCast(&self.data[self.header.e_shoff])),
     )[0..self.header.e_shnum];
 }
 
@@ -424,16 +424,16 @@ pub fn getSourceSymtab(self: Object) []const elf.Elf64_Sym {
     const index = self.symtab_index orelse return &[0]elf.Elf64_Sym{};
     const shdr = self.getShdrs()[index];
     const nsyms = @divExact(shdr.sh_size, @sizeOf(elf.Elf64_Sym));
-    return @ptrCast(
+    return @as(
         [*]const elf.Elf64_Sym,
-        @alignCast(@alignOf(elf.Elf64_Sym), &self.data[shdr.sh_offset]),
+        @ptrCast(@alignCast(&self.data[shdr.sh_offset])),
     )[0..nsyms];
 }
 
 pub fn getSourceStrtab(self: Object) []const u8 {
     const index = self.symtab_index orelse return &[0]u8{};
     const shdr = self.getShdrs()[index];
-    return self.getShdrContents(@intCast(u16, shdr.sh_link));
+    return self.getShdrContents(@as(u16, @intCast(shdr.sh_link)));
 }
 
 pub fn getSourceShstrtab(self: Object) []const u8 {
@@ -476,13 +476,13 @@ pub fn getAtomForSymbol(self: Object, sym_index: u32) ?*Atom {
 pub fn getString(self: Object, off: u32) []const u8 {
     const strtab = self.getSourceStrtab();
     assert(off < strtab.len);
-    return mem.sliceTo(@ptrCast([*:0]const u8, strtab.ptr + off), 0);
+    return mem.sliceTo(@as([*:0]const u8, @ptrCast(strtab.ptr + off)), 0);
 }
 
 pub fn getShString(self: Object, off: u32) []const u8 {
     const shstrtab = self.getSourceShstrtab();
     assert(off < shstrtab.len);
-    return mem.sliceTo(@ptrCast([*:0]const u8, shstrtab.ptr + off), 0);
+    return mem.sliceTo(@as([*:0]const u8, @ptrCast(shstrtab.ptr + off)), 0);
 }
 
 fn isDefinitionAvailable(elf_file: *Elf, global: Elf.SymbolWithLoc) bool {

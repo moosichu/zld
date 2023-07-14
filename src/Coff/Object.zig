@@ -63,7 +63,7 @@ const Symbol = extern struct {
             const offset = mem.readIntNative(u32, self.name[4..]);
             return object.getString(offset);
         } else {
-            return mem.span(@ptrCast([*:0]const u8, &self.name));
+            return mem.span(@ptrCast(&self.name));
         }
     }
 };
@@ -118,7 +118,7 @@ pub fn parse(self: *Object, allocator: Allocator, cpu_arch: std.Target.Cpu.Arch)
         return error.NotObject;
     }
 
-    if (header.machine != @enumToInt(cpu_arch.toCoffMachine())) {
+    if (header.machine != @intFromEnum(cpu_arch.toCoffMachine())) {
         log.debug("Invalid architecture {any}, expected {any}", .{
             header.machine,
             cpu_arch.toCoffMachine(),
@@ -183,5 +183,5 @@ fn parseStrtab(self: *Object, allocator: Allocator) !void {
 pub fn getString(self: *Object, off: u32) []const u8 {
     const local_offset = off - @sizeOf(u32);
     assert(local_offset < self.symtab.items.len);
-    return mem.span(@ptrCast([*:0]const u8, self.strtab.ptr + local_offset));
+    return mem.span(@as([*:0]const u8, @ptrCast(self.strtab.ptr + local_offset)));
 }

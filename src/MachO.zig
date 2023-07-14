@@ -158,7 +158,7 @@ const default_pagezero_vmsize: u64 = 0x100000000;
 /// potential future extensions.
 const default_headerpad_size: u32 = 0x1000;
 
-pub const N_DEAD: u16 = @bitCast(u16, @as(i16, -1));
+pub const N_DEAD: u16 = @as(u16, @bitCast(@as(i16, -1)));
 
 pub fn openPath(allocator: Allocator, options: Options, thread_pool: *ThreadPool) !*MachO {
     const file = try options.emit.directory.createFile(options.emit.sub_path, .{
@@ -463,13 +463,13 @@ pub fn flush(self: *MachO) !void {
     const lc_writer = lc_buffer.writer();
 
     try self.writeSegmentHeaders(lc_writer);
-    const linkedit_cmd_offset = @sizeOf(macho.mach_header_64) + @intCast(u32, lc_buffer.items.len - @sizeOf(macho.segment_command_64));
+    const linkedit_cmd_offset = @sizeOf(macho.mach_header_64) + @as(u32, @intCast(lc_buffer.items.len - @sizeOf(macho.segment_command_64)));
 
     try lc_writer.writeStruct(self.dyld_info_cmd);
     try lc_writer.writeStruct(self.function_starts_cmd);
     try lc_writer.writeStruct(self.data_in_code_cmd);
 
-    const symtab_cmd_offset = @sizeOf(macho.mach_header_64) + @intCast(u32, lc_buffer.items.len);
+    const symtab_cmd_offset = @sizeOf(macho.mach_header_64) + @as(u32, @intCast(lc_buffer.items.len));
     try lc_writer.writeStruct(self.symtab_cmd);
     try lc_writer.writeStruct(self.dysymtab_cmd);
 
@@ -481,7 +481,7 @@ pub fn flush(self: *MachO) !void {
         const global = self.getEntryPoint();
         const sym = self.getSymbol(global);
         try lc_writer.writeStruct(macho.entry_point_command{
-            .entryoff = @intCast(u32, sym.n_value - seg.vmaddr),
+            .entryoff = @as(u32, @intCast(sym.n_value - seg.vmaddr)),
             .stacksize = self.options.stack_size orelse 0,
         });
     } else {
@@ -495,20 +495,20 @@ pub fn flush(self: *MachO) !void {
     });
     try load_commands.writeBuildVersionLC(&self.options, lc_writer);
 
-    const uuid_cmd_offset = @sizeOf(macho.mach_header_64) + @intCast(u32, lc_buffer.items.len);
+    const uuid_cmd_offset = @sizeOf(macho.mach_header_64) + @as(u32, @intCast(lc_buffer.items.len));
     try lc_writer.writeStruct(self.uuid_cmd);
 
     try load_commands.writeLoadDylibLCs(self.dylibs.items, self.referenced_dylibs.keys(), lc_writer);
 
     var codesig_cmd_offset: ?u32 = null;
     if (requires_codesig) {
-        codesig_cmd_offset = @sizeOf(macho.mach_header_64) + @intCast(u32, lc_buffer.items.len);
+        codesig_cmd_offset = @sizeOf(macho.mach_header_64) + @as(u32, @intCast(lc_buffer.items.len));
         try lc_writer.writeStruct(self.codesig_cmd);
     }
 
     const ncmds = load_commands.calcNumOfLCs(lc_buffer.items);
     try self.base.file.pwriteAll(lc_buffer.items, @sizeOf(macho.mach_header_64));
-    try self.writeHeader(ncmds, @intCast(u32, lc_buffer.items.len));
+    try self.writeHeader(ncmds, @as(u32, @intCast(lc_buffer.items.len)));
 
     try self.writeUuid(.{
         .linkedit_cmd_offset = linkedit_cmd_offset,
@@ -631,7 +631,7 @@ fn parseObject(self: *MachO, path: []const u8) !bool {
     const cpu_arch = self.options.target.cpu_arch.?;
     const mtime: u64 = mtime: {
         const stat = file.stat() catch break :mtime 0;
-        break :mtime @intCast(u64, @divFloor(stat.mtime, 1_000_000_000));
+        break :mtime @as(u64, @intCast(@divFloor(stat.mtime, 1_000_000_000)));
     };
     const file_stat = try file.stat();
     const file_size = math.cast(usize, file_stat.size) orelse return error.Overflow;
@@ -745,7 +745,7 @@ pub fn parseDylib(
     const contents = try file.readToEndAllocOptions(gpa, file_size, file_size, @alignOf(u64), null);
     defer gpa.free(contents);
 
-    const dylib_id = @intCast(u16, self.dylibs.items.len);
+    const dylib_id = @as(u16, @intCast(self.dylibs.items.len));
     var dylib = Dylib{ .weak = opts.weak };
 
     dylib.parseFromBinary(
@@ -1073,7 +1073,7 @@ pub fn addAtomToSection(self: *MachO, atom_index: AtomIndex) void {
 
 pub fn createEmptyAtom(self: *MachO, sym_index: u32, size: u64, alignment: u32) !AtomIndex {
     const gpa = self.base.allocator;
-    const index = @intCast(AtomIndex, self.atoms.items.len);
+    const index = @as(AtomIndex, @intCast(self.atoms.items.len));
     const atom = try self.atoms.addOne(gpa);
     atom.* = Atom.empty;
     atom.sym_index = sym_index;
@@ -1134,7 +1134,7 @@ fn createDyldStubBinderGotAtom(self: *MachO) !void {
     const gpa = self.base.allocator;
     const target = SymbolWithLoc{ .sym_index = sym_index };
     const atom_index = try self.createGotAtom();
-    const got_index = @intCast(u32, self.got_entries.items.len);
+    const got_index = @as(u32, @intCast(self.got_entries.items.len));
     try self.got_entries.append(gpa, .{
         .target = target,
         .atom_index = atom_index,
@@ -1477,7 +1477,7 @@ fn resolveSymbols(self: *MachO, resolver: *SymbolResolver) !void {
     defer tracy.end();
 
     for (self.objects.items, 0..) |_, object_id| {
-        try self.resolveSymbolsInObject(@intCast(u16, object_id), resolver);
+        try self.resolveSymbolsInObject(@as(u16, @intCast(object_id)), resolver);
     }
 
     try self.resolveSymbolsInArchives(resolver);
@@ -1532,7 +1532,7 @@ fn resolveSymbolsInObject(self: *MachO, object_id: u16, resolver: *SymbolResolve
 
         const global_index = resolver.table.get(sym_name) orelse {
             const gpa = self.base.allocator;
-            const global_index = @intCast(u32, self.globals.items.len);
+            const global_index = @as(u32, @intCast(self.globals.items.len));
             try self.globals.append(gpa, sym_loc);
             try resolver.table.putNoClobber(sym_name, global_index);
             if (sym.undf() and !sym.tentative()) {
@@ -1618,7 +1618,7 @@ fn resolveSymbolsInArchives(self: *MachO, resolver: *SymbolResolver) !void {
             };
             assert(offsets.items.len > 0);
 
-            const object_id = @intCast(u16, self.objects.items.len);
+            const object_id = @as(u16, @intCast(self.objects.items.len));
             const object = try archive.parseObject(gpa, cpu_arch, offsets.items[0]);
             try self.objects.append(gpa, object);
             try self.resolveSymbolsInObject(object_id, resolver);
@@ -1643,14 +1643,14 @@ fn resolveSymbolsInDylibs(self: *MachO, resolver: *SymbolResolver) !void {
         for (self.dylibs.items, 0..) |dylib, id| {
             if (!dylib.symbols.contains(sym_name)) continue;
 
-            const dylib_id = @intCast(u16, id);
+            const dylib_id = @as(u16, @intCast(id));
             if (!self.referenced_dylibs.contains(dylib_id)) {
                 try self.referenced_dylibs.putNoClobber(self.base.allocator, dylib_id, {});
             }
 
             const ordinal = self.referenced_dylibs.getIndex(dylib_id) orelse unreachable;
             sym.n_type |= macho.N_EXT;
-            sym.n_desc = @intCast(u16, ordinal + 1) * macho.N_SYMBOL_RESOLVER;
+            sym.n_desc = @as(u16, @intCast(ordinal + 1)) * macho.N_SYMBOL_RESOLVER;
 
             if (dylib.weak) {
                 sym.n_desc |= macho.N_WEAK_REF;
@@ -1683,9 +1683,9 @@ fn resolveSymbolsAtLoading(self: *MachO, resolver: *SymbolResolver) !void {
             _ = resolver.unresolved.swapRemove(global_index);
             continue;
         } else if (self.options.allow_undef) {
-            const n_desc = @bitCast(
+            const n_desc = @as(
                 u16,
-                macho.BIND_SPECIAL_DYLIB_FLAT_LOOKUP * @intCast(i16, macho.N_SYMBOL_RESOLVER),
+                @bitCast(macho.BIND_SPECIAL_DYLIB_FLAT_LOOKUP * @as(i16, @intCast(macho.N_SYMBOL_RESOLVER))),
             );
             sym.n_type = macho.N_EXT;
             sym.n_desc = n_desc;
@@ -1726,7 +1726,7 @@ fn createMhExecuteHeaderSymbol(self: *MachO, resolver: *SymbolResolver) !void {
         global.* = sym_loc;
         self.mh_execute_header_index = global_index;
     } else {
-        const global_index = @intCast(u32, self.globals.items.len);
+        const global_index = @as(u32, @intCast(self.globals.items.len));
         try self.globals.append(gpa, sym_loc);
         self.mh_execute_header_index = global_index;
     }
@@ -1770,14 +1770,14 @@ fn resolveDyldStubBinder(self: *MachO, resolver: *SymbolResolver) !void {
     for (self.dylibs.items, 0..) |dylib, id| {
         if (!dylib.symbols.contains(sym_name)) continue;
 
-        const dylib_id = @intCast(u16, id);
+        const dylib_id = @as(u16, @intCast(id));
         if (!self.referenced_dylibs.contains(dylib_id)) {
             try self.referenced_dylibs.putNoClobber(gpa, dylib_id, {});
         }
 
         const ordinal = self.referenced_dylibs.getIndex(dylib_id) orelse unreachable;
         sym.n_type |= macho.N_EXT;
-        sym.n_desc = @intCast(u16, ordinal + 1) * macho.N_SYMBOL_RESOLVER;
+        sym.n_desc = @as(u16, @intCast(ordinal + 1)) * macho.N_SYMBOL_RESOLVER;
         self.dyld_stub_binder_index = sym_index;
 
         break;
@@ -1867,7 +1867,7 @@ fn createSegments(self: *MachO) !void {
         const segname = header.segName();
         const segment_id = self.getSegmentByName(segname) orelse blk: {
             log.debug("creating segment '{s}'", .{segname});
-            const segment_id = @intCast(u8, self.segments.items.len);
+            const segment_id = @as(u8, @intCast(self.segments.items.len));
             const protection = getSegmentMemoryProtection(segname);
             try self.segments.append(self.base.allocator, .{
                 .cmdsize = @sizeOf(macho.segment_command_64),
@@ -1898,7 +1898,7 @@ fn createSegments(self: *MachO) !void {
 pub fn allocateSymbol(self: *MachO) !u32 {
     try self.locals.ensureUnusedCapacity(self.base.allocator, 1);
     log.debug("  (allocating symbol index {d})", .{self.locals.items.len});
-    const index = @intCast(u32, self.locals.items.len);
+    const index = @as(u32, @intCast(self.locals.items.len));
     _ = self.locals.addOneAssumeCapacity();
     self.locals.items[index] = .{
         .n_strx = 0,
@@ -1936,7 +1936,7 @@ fn splitIntoAtoms(self: *MachO) !void {
     defer tracy.end();
 
     for (self.objects.items, 0..) |*object, object_id| {
-        try object.splitIntoAtoms(self, @intCast(u31, object_id));
+        try object.splitIntoAtoms(self, @as(u31, @intCast(object_id)));
     }
 }
 
@@ -2130,7 +2130,7 @@ fn calcSectionSizes(self: *MachO) !void {
             if (mem.eql(u8, header.sectName(), "__stub_helper")) continue;
 
             // Create jump/branch range extenders if needed.
-            try thunks.createThunks(self, @intCast(u8, sect_id));
+            try thunks.createThunks(self, @as(u8, @intCast(sect_id)));
         }
     }
 }
@@ -2146,7 +2146,7 @@ fn allocateSegments(self: *MachO) !void {
             .dylibs = self.dylibs.items,
             .referenced_dylibs = self.referenced_dylibs.keys(),
         }) else 0;
-        try self.allocateSegment(@intCast(u8, segment_index), base_size);
+        try self.allocateSegment(@as(u8, @intCast(segment_index)), base_size);
 
         // TODO
         // if (is_text_segment) blk: {
@@ -2208,12 +2208,12 @@ fn allocateSegment(self: *MachO, segment_index: u8, init_size: u64) !void {
     for (slice.items(.header)[indexes.start..indexes.end], 0..) |*header, sect_id| {
         const alignment = try math.powi(u32, 2, header.@"align");
         const start_aligned = mem.alignForwardGeneric(u64, start, alignment);
-        const n_sect = @intCast(u8, indexes.start + sect_id + 1);
+        const n_sect = @as(u8, @intCast(indexes.start + sect_id + 1));
 
         header.offset = if (header.isZerofill())
             0
         else
-            @intCast(u32, segment.fileoff + start_aligned);
+            @as(u32, @intCast(segment.fileoff + start_aligned));
         header.addr = segment.vmaddr + start_aligned;
 
         var atom_index = slice.items(.first_atom_index)[indexes.start + sect_id];
@@ -2289,7 +2289,7 @@ pub fn initSection(
 ) !u8 {
     const gpa = self.base.allocator;
     log.debug("creating section '{s},{s}'", .{ segname, sectname });
-    const index = @intCast(u8, self.sections.slice().len);
+    const index = @as(u8, @intCast(self.sections.slice().len));
     try self.sections.append(gpa, .{
         .segment_index = undefined, // Segments will be created automatically later down the pipeline.
         .header = .{
@@ -2345,12 +2345,12 @@ fn getSectionPrecedence(header: macho.section_64) u8 {
             },
         }
     };
-    return (@intCast(u8, segment_precedence) << 4) + section_precedence;
+    return (@as(u8, @intCast(segment_precedence)) << 4) + section_precedence;
 }
 
 fn writeSegmentHeaders(self: *MachO, writer: anytype) !void {
     for (self.segments.items, 0..) |seg, i| {
-        const indexes = self.getSectionIndexes(@intCast(u8, i));
+        const indexes = self.getSectionIndexes(@as(u8, @intCast(i)));
         var out_seg = seg;
         out_seg.cmdsize = @sizeOf(macho.segment_command_64);
         out_seg.nsects = 0;
@@ -2466,7 +2466,7 @@ fn collectRebaseData(self: *MachO, rebase: *Rebase) !void {
         }
 
         const segment_index = slice.items(.segment_index)[sect_id];
-        const segment = self.getSegment(@intCast(u8, sect_id));
+        const segment = self.getSegment(@as(u8, @intCast(sect_id)));
         if (segment.maxprot & macho.PROT.WRITE == 0) continue;
 
         log.debug("{s},{s}", .{ header.segName(), header.sectName() });
@@ -2497,19 +2497,19 @@ fn collectRebaseData(self: *MachO, rebase: *Rebase) !void {
                 const base_rel_offset: i32 = blk: {
                     const source_sym = object.getSourceSymbol(atom.sym_index) orelse break :blk 0;
                     const source_sect = object.getSourceSection(source_sym.n_sect - 1);
-                    break :blk @intCast(i32, source_sym.n_value - source_sect.addr);
+                    break :blk @as(i32, @intCast(source_sym.n_value - source_sect.addr));
                 };
                 const relocs = Atom.getAtomRelocs(self, atom_index);
 
                 for (relocs) |rel| {
                     switch (cpu_arch) {
                         .aarch64 => {
-                            const rel_type = @intToEnum(macho.reloc_type_arm64, rel.r_type);
+                            const rel_type = @as(macho.reloc_type_arm64, @enumFromInt(rel.r_type));
                             if (rel_type != .ARM64_RELOC_UNSIGNED) continue;
                             if (rel.r_length != 3) continue;
                         },
                         .x86_64 => {
-                            const rel_type = @intToEnum(macho.reloc_type_x86_64, rel.r_type);
+                            const rel_type = @as(macho.reloc_type_x86_64, @enumFromInt(rel.r_type));
                             if (rel_type != .X86_64_RELOC_UNSIGNED) continue;
                             if (rel.r_length != 3) continue;
                         },
@@ -2519,9 +2519,9 @@ fn collectRebaseData(self: *MachO, rebase: *Rebase) !void {
                     const target_sym = self.getSymbol(target);
                     if (target_sym.undf()) continue;
 
-                    const base_offset = @intCast(i32, sym.n_value - segment.vmaddr);
+                    const base_offset = @as(i32, @intCast(sym.n_value - segment.vmaddr));
                     const rel_offset = rel.r_address - base_rel_offset;
-                    const offset = @intCast(u64, base_offset + rel_offset);
+                    const offset = @as(u64, @intCast(base_offset + rel_offset));
                     log.debug("    | rebase at {x}", .{offset + segment.vmaddr});
 
                     try rebase.entries.append(gpa, .{
@@ -2555,7 +2555,7 @@ fn collectBindDataFromContainer(self: *MachO, sect_id: u8, bind: *Bind, containe
 
         const sym = entry.getAtomSymbol(self);
         const base_offset = sym.n_value - seg.vmaddr;
-        const dylib_ordinal = @divTrunc(@bitCast(i16, bind_sym.n_desc), macho.N_SYMBOL_RESOLVER);
+        const dylib_ordinal = @divTrunc(@as(i16, @bitCast(bind_sym.n_desc)), macho.N_SYMBOL_RESOLVER);
         log.debug("bind at {x}, import('{s}') in dylib({d})", .{
             seg.vmaddr + base_offset,
             bind_sym_name,
@@ -2601,7 +2601,7 @@ fn collectBindData(self: *MachO, bind: *Bind) !void {
         }
 
         const segment_index = slice.items(.segment_index)[sect_id];
-        const segment = self.getSegment(@intCast(u8, sect_id));
+        const segment = self.getSegment(@as(u8, @intCast(sect_id)));
         if (segment.maxprot & macho.PROT.WRITE == 0) continue;
 
         log.debug("{s},{s}", .{ header.segName(), header.sectName() });
@@ -2628,19 +2628,19 @@ fn collectBindData(self: *MachO, bind: *Bind) !void {
                 const base_rel_offset: i32 = blk: {
                     const source_sym = object.getSourceSymbol(atom.sym_index) orelse break :blk 0;
                     const source_sect = object.getSourceSection(source_sym.n_sect - 1);
-                    break :blk @intCast(i32, source_sym.n_value - source_sect.addr);
+                    break :blk @as(i32, @intCast(source_sym.n_value - source_sect.addr));
                 };
                 const relocs = Atom.getAtomRelocs(self, atom_index);
 
                 for (relocs) |rel| {
                     switch (cpu_arch) {
                         .aarch64 => {
-                            const rel_type = @intToEnum(macho.reloc_type_arm64, rel.r_type);
+                            const rel_type = @as(macho.reloc_type_arm64, @enumFromInt(rel.r_type));
                             if (rel_type != .ARM64_RELOC_UNSIGNED) continue;
                             if (rel.r_length != 3) continue;
                         },
                         .x86_64 => {
-                            const rel_type = @intToEnum(macho.reloc_type_x86_64, rel.r_type);
+                            const rel_type = @as(macho.reloc_type_x86_64, @enumFromInt(rel.r_type));
                             if (rel_type != .X86_64_RELOC_UNSIGNED) continue;
                             if (rel.r_length != 3) continue;
                         },
@@ -2653,13 +2653,13 @@ fn collectBindData(self: *MachO, bind: *Bind) !void {
                     if (!bind_sym.undf()) continue;
 
                     const base_offset = sym.n_value - segment.vmaddr;
-                    const rel_offset = @intCast(u32, rel.r_address - base_rel_offset);
-                    const offset = @intCast(u64, base_offset + rel_offset);
+                    const rel_offset = @as(u32, @intCast(rel.r_address - base_rel_offset));
+                    const offset = @as(u64, @intCast(base_offset + rel_offset));
 
                     const code = Atom.getAtomCode(self, atom_index);
                     const addend = mem.readIntLittle(i64, code[rel_offset..][0..8]);
 
-                    const dylib_ordinal = @divTrunc(@bitCast(i16, bind_sym.n_desc), macho.N_SYMBOL_RESOLVER);
+                    const dylib_ordinal = @divTrunc(@as(i16, @bitCast(bind_sym.n_desc)), macho.N_SYMBOL_RESOLVER);
                     log.debug("bind at {x}, import('{s}') in dylib({d})", .{
                         segment.vmaddr + offset,
                         bind_sym_name,
@@ -2712,7 +2712,7 @@ fn collectLazyBindData(self: *MachO, lazy_bind: *LazyBind) !void {
         const stub_entry = self.stubs.items[count];
         const bind_sym = stub_entry.getTargetSymbol(self);
         const bind_sym_name = stub_entry.getTargetSymbolName(self);
-        const dylib_ordinal = @divTrunc(@bitCast(i16, bind_sym.n_desc), macho.N_SYMBOL_RESOLVER);
+        const dylib_ordinal = @divTrunc(@as(i16, @bitCast(bind_sym.n_desc)), macho.N_SYMBOL_RESOLVER);
         log.debug("    | lazy bind at {x}, import('{s}') in dylib({d})", .{
             base_offset,
             bind_sym_name,
@@ -2854,14 +2854,14 @@ fn writeDyldInfoData(self: *MachO) !void {
     try self.base.file.pwriteAll(buffer, rebase_off);
     try self.populateLazyBindOffsetsInStubHelper(lazy_bind);
 
-    self.dyld_info_cmd.rebase_off = @intCast(u32, rebase_off);
-    self.dyld_info_cmd.rebase_size = @intCast(u32, rebase_size_aligned);
-    self.dyld_info_cmd.bind_off = @intCast(u32, bind_off);
-    self.dyld_info_cmd.bind_size = @intCast(u32, bind_size_aligned);
-    self.dyld_info_cmd.lazy_bind_off = @intCast(u32, lazy_bind_off);
-    self.dyld_info_cmd.lazy_bind_size = @intCast(u32, lazy_bind_size_aligned);
-    self.dyld_info_cmd.export_off = @intCast(u32, export_off);
-    self.dyld_info_cmd.export_size = @intCast(u32, export_size_aligned);
+    self.dyld_info_cmd.rebase_off = @as(u32, @intCast(rebase_off));
+    self.dyld_info_cmd.rebase_size = @as(u32, @intCast(rebase_size_aligned));
+    self.dyld_info_cmd.bind_off = @as(u32, @intCast(bind_off));
+    self.dyld_info_cmd.bind_size = @as(u32, @intCast(bind_size_aligned));
+    self.dyld_info_cmd.lazy_bind_off = @as(u32, @intCast(lazy_bind_off));
+    self.dyld_info_cmd.lazy_bind_size = @as(u32, @intCast(lazy_bind_size_aligned));
+    self.dyld_info_cmd.export_off = @as(u32, @intCast(export_off));
+    self.dyld_info_cmd.export_size = @as(u32, @intCast(export_size_aligned));
 }
 
 fn populateLazyBindOffsetsInStubHelper(self: *MachO, lazy_bind: LazyBind) !void {
@@ -2931,7 +2931,7 @@ fn writeFunctionStarts(self: *MachO) !void {
 
     var last_off: u32 = 0;
     for (addresses.items) |addr| {
-        const offset = @intCast(u32, addr - text_seg.vmaddr);
+        const offset = @as(u32, @intCast(addr - text_seg.vmaddr));
         const diff = offset - last_off;
 
         if (diff == 0) continue;
@@ -2943,7 +2943,7 @@ fn writeFunctionStarts(self: *MachO) !void {
     var buffer = std.ArrayList(u8).init(gpa);
     defer buffer.deinit();
 
-    const max_size = @intCast(usize, offsets.items.len * @sizeOf(u64));
+    const max_size = @as(usize, @intCast(offsets.items.len * @sizeOf(u64)));
     try buffer.ensureTotalCapacity(max_size);
 
     for (offsets.items) |offset| {
@@ -2966,8 +2966,8 @@ fn writeFunctionStarts(self: *MachO) !void {
 
     try self.base.file.pwriteAll(buffer.items, offset);
 
-    self.function_starts_cmd.dataoff = @intCast(u32, offset);
-    self.function_starts_cmd.datasize = @intCast(u32, needed_size_aligned);
+    self.function_starts_cmd.dataoff = @as(u32, @intCast(offset));
+    self.function_starts_cmd.datasize = @as(u32, @intCast(needed_size_aligned));
 }
 
 fn filterDataInCode(
@@ -3009,8 +3009,8 @@ fn writeDataInCode(self: *MachO) !void {
             const source_addr = if (object.getSourceSymbol(atom.sym_index)) |source_sym|
                 source_sym.n_value
             else blk: {
-                const nbase = @intCast(u32, object.in_symtab.?.len);
-                const source_sect_id = @intCast(u8, atom.sym_index - nbase);
+                const nbase = @as(u32, @intCast(object.in_symtab.?.len));
+                const source_sect_id = @as(u8, @intCast(atom.sym_index - nbase));
                 break :blk object.getSourceSection(source_sect_id).addr;
             };
             const filtered_dice = filterDataInCode(dice, source_addr, source_addr + atom.size);
@@ -3045,8 +3045,8 @@ fn writeDataInCode(self: *MachO) !void {
 
     try self.base.file.pwriteAll(buffer, offset);
 
-    self.data_in_code_cmd.dataoff = @intCast(u32, offset);
-    self.data_in_code_cmd.datasize = @intCast(u32, needed_size_aligned);
+    self.data_in_code_cmd.dataoff = @as(u32, @intCast(offset));
+    self.data_in_code_cmd.datasize = @as(u32, @intCast(needed_size_aligned));
 }
 
 fn writeSymtabs(self: *MachO) !void {
@@ -3100,7 +3100,7 @@ fn writeSymtab(self: *MachO) !SymtabCtx {
         if (!sym.undf()) continue; // not an import, skip
         if (sym.n_desc == N_DEAD) continue;
 
-        const new_index = @intCast(u32, imports.items.len);
+        const new_index = @as(u32, @intCast(imports.items.len));
         var out_sym = sym;
         out_sym.n_strx = try self.strtab.insert(gpa, self.getSymbolName(global));
         try imports.append(out_sym);
@@ -3115,9 +3115,9 @@ fn writeSymtab(self: *MachO) !SymtabCtx {
         }
     }
 
-    const nlocals = @intCast(u32, locals.items.len);
-    const nexports = @intCast(u32, exports.items.len);
-    const nimports = @intCast(u32, imports.items.len);
+    const nlocals = @as(u32, @intCast(locals.items.len));
+    const nexports = @as(u32, @intCast(exports.items.len));
+    const nimports = @as(u32, @intCast(imports.items.len));
     const nsyms = nlocals + nexports + nimports;
 
     const seg = self.getLinkeditSegmentPtr();
@@ -3137,7 +3137,7 @@ fn writeSymtab(self: *MachO) !SymtabCtx {
     log.debug("writing symtab from 0x{x} to 0x{x}", .{ offset, offset + needed_size });
     try self.base.file.pwriteAll(buffer.items, offset);
 
-    self.symtab_cmd.symoff = @intCast(u32, offset);
+    self.symtab_cmd.symoff = @as(u32, @intCast(offset));
     self.symtab_cmd.nsyms = nsyms;
 
     return SymtabCtx{
@@ -3165,8 +3165,8 @@ fn writeStrtab(self: *MachO) !void {
 
     try self.base.file.pwriteAll(buffer, offset);
 
-    self.symtab_cmd.stroff = @intCast(u32, offset);
-    self.symtab_cmd.strsize = @intCast(u32, needed_size_aligned);
+    self.symtab_cmd.stroff = @as(u32, @intCast(offset));
+    self.symtab_cmd.strsize = @as(u32, @intCast(needed_size_aligned));
 }
 
 const SymtabCtx = struct {
@@ -3178,8 +3178,8 @@ const SymtabCtx = struct {
 
 fn writeDysymtab(self: *MachO, ctx: SymtabCtx) !void {
     const gpa = self.base.allocator;
-    const nstubs = @intCast(u32, self.stubs.items.len);
-    const ngot_entries = @intCast(u32, self.got_entries.items.len);
+    const nstubs = @as(u32, @intCast(self.stubs.items.len));
+    const ngot_entries = @as(u32, @intCast(self.got_entries.items.len));
     const nindirectsyms = nstubs * 2 + ngot_entries;
     const iextdefsym = ctx.nlocalsym;
     const iundefsym = iextdefsym + ctx.nextdefsym;
@@ -3245,7 +3245,7 @@ fn writeDysymtab(self: *MachO, ctx: SymtabCtx) !void {
     self.dysymtab_cmd.nextdefsym = ctx.nextdefsym;
     self.dysymtab_cmd.iundefsym = iundefsym;
     self.dysymtab_cmd.nundefsym = ctx.nundefsym;
-    self.dysymtab_cmd.indirectsymoff = @intCast(u32, offset);
+    self.dysymtab_cmd.indirectsymoff = @as(u32, @intCast(offset));
     self.dysymtab_cmd.nindirectsyms = nindirectsyms;
 }
 
@@ -3256,7 +3256,7 @@ fn writeUuid(self: *MachO, args: struct {
     codesig_cmd_offset: ?u32,
 }) !void {
     // We set the max file size to the actual strtab buffer length to exclude any strtab padding.
-    const max_file_end = @intCast(u32, self.symtab_cmd.stroff + self.strtab.buffer.items.len);
+    const max_file_end = @as(u32, @intCast(self.symtab_cmd.stroff + self.strtab.buffer.items.len));
 
     const FileSubsection = struct {
         start: u32,
@@ -3297,7 +3297,7 @@ fn writeUuid(self: *MachO, args: struct {
         const locals = try self.base.allocator.alloc(macho.nlist_64, nlocals);
         defer self.base.allocator.free(locals);
 
-        const locals_buf = @ptrCast([*]u8, locals.ptr)[0 .. @sizeOf(macho.nlist_64) * nlocals];
+        const locals_buf = @as([*]u8, @ptrCast(locals.ptr))[0 .. @sizeOf(macho.nlist_64) * nlocals];
         const amt = try self.base.file.preadAll(locals_buf, self.symtab_cmd.symoff);
         if (amt != locals_buf.len) return error.InputOutput;
 
@@ -3326,12 +3326,12 @@ fn writeUuid(self: *MachO, args: struct {
                     @as(u32, @sizeOf(macho.symtab_command) + @sizeOf(macho.dysymtab_command))
                 else
                     @sizeOf(macho.linkedit_data_command),
-                .end = @intCast(u32, self.symtab_cmd.symoff + istab * @sizeOf(macho.nlist_64)),
+                .end = @as(u32, @intCast(self.symtab_cmd.symoff + istab * @sizeOf(macho.nlist_64))),
             };
             count += 1;
 
             subsections[count] = .{
-                .start = subsections[count - 1].end + @intCast(u32, nstabs * @sizeOf(macho.nlist_64)),
+                .start = subsections[count - 1].end + @as(u32, @intCast(nstabs * @sizeOf(macho.nlist_64))),
                 .end = self.symtab_cmd.stroff + stab_stroff,
             };
             count += 1;
@@ -3396,8 +3396,8 @@ fn writeCodeSignaturePadding(self: *MachO, code_sig: *CodeSignature) !void {
     // except for code signature data.
     try self.base.file.pwriteAll(&[_]u8{0}, offset + needed_size - 1);
 
-    self.codesig_cmd.dataoff = @intCast(u32, offset);
-    self.codesig_cmd.datasize = @intCast(u32, needed_size);
+    self.codesig_cmd.dataoff = @as(u32, @intCast(offset));
+    self.codesig_cmd.datasize = @as(u32, @intCast(needed_size));
 }
 
 fn writeCodeSignature(self: *MachO, code_sig: *CodeSignature) !void {
@@ -3486,7 +3486,7 @@ pub fn getAtom(self: MachO, atom_index: AtomIndex) Atom {
 
 fn getSegmentByName(self: MachO, segname: []const u8) ?u8 {
     for (self.segments.items, 0..) |seg, i| {
-        if (mem.eql(u8, segname, seg.segName())) return @intCast(u8, i);
+        if (mem.eql(u8, segname, seg.segName())) return @as(u8, @intCast(i));
     } else return null;
 }
 
@@ -3511,15 +3511,15 @@ pub fn getSectionByName(self: MachO, segname: []const u8, sectname: []const u8) 
     // TODO investigate caching with a hashmap
     for (self.sections.items(.header), 0..) |header, i| {
         if (mem.eql(u8, header.segName(), segname) and mem.eql(u8, header.sectName(), sectname))
-            return @intCast(u8, i);
+            return @as(u8, @intCast(i));
     } else return null;
 }
 
 pub fn getSectionIndexes(self: MachO, segment_index: u8) struct { start: u8, end: u8 } {
     var start: u8 = 0;
     const nsects = for (self.segments.items, 0..) |seg, i| {
-        if (i == segment_index) break @intCast(u8, seg.nsects);
-        start += @intCast(u8, seg.nsects);
+        if (i == segment_index) break @as(u8, @intCast(seg.nsects));
+        start += @as(u8, @intCast(seg.nsects));
     } else 0;
     return .{ .start = start, .end = start + nsects };
 }
@@ -3708,7 +3708,7 @@ pub fn generateSymbolStabs(self: *MachO, object: Object, locals: *std.ArrayList(
     var name_lookup: ?DwarfInfo.SubprogramLookupByName = if (object.header.flags & macho.MH_SUBSECTIONS_VIA_SYMBOLS == 0) blk: {
         var name_lookup = DwarfInfo.SubprogramLookupByName.init(gpa);
         errdefer name_lookup.deinit();
-        try name_lookup.ensureUnusedCapacity(@intCast(u32, object.atoms.items.len));
+        try name_lookup.ensureUnusedCapacity(@as(u32, @intCast(object.atoms.items.len)));
         try debug_info.genSubprogramLookupByName(compile_unit, lookup, &name_lookup);
         break :blk name_lookup;
     } else null;
@@ -3898,7 +3898,7 @@ fn logSymtab(self: *MachO) void {
             mem.set(u8, &buf, '_');
             scoped_log.debug("    %{d}: {s} @{x} in sect({d}), {s}", .{
                 sym_id,
-                object.getSymbolName(@intCast(u32, sym_id)),
+                object.getSymbolName(@as(u32, @intCast(sym_id))),
                 sym.n_value,
                 sym.n_sect,
                 logSymAttributes(sym, &buf),
